@@ -201,6 +201,9 @@ function updateWeeklyStats(weekData) {
   
   weekFocusElement.textContent = `${avgFocus}%`;
   weekTotalTimeElement.textContent = `${Math.round(totalMinutes / 60)}h`;
+  
+  // Generate and display insights
+  generateDailyInsights(weekData, avgFocus, totalMinutes);
 }
 
 function createWeeklyChart(weekData) {
@@ -373,8 +376,173 @@ function formatTime(minutes) {
   return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
+function generateDailyInsights(weekData, avgFocus, totalMinutes) {
+  const insights = [];
+  const today = new Date().toDateString();
+  const todayData = weekData.find(day => day.date === today)?.data || { focusScore: 100, timeByCategory: {} };
+  
+  // Focus score insights
+  if (avgFocus >= 80) {
+    insights.push({
+      type: 'success',
+      icon: '🎯',
+      message: `Great focus this week! Average score: ${avgFocus}%`
+    });
+  } else if (avgFocus >= 60) {
+    insights.push({
+      type: 'warning', 
+      icon: '📈',
+      message: `Focus could improve. Try reducing distractions by 15 min/day`
+    });
+  } else {
+    insights.push({
+      type: 'alert',
+      icon: '🚨', 
+      message: `Focus needs attention. Consider using website blockers`
+    });
+  }
+  
+  // Time management insight
+  const dailyAvgHours = Math.round((totalMinutes / 7) / 60 * 10) / 10;
+  if (dailyAvgHours < 4) {
+    insights.push({
+      type: 'info',
+      icon: '⏱️',
+      message: `Low activity: ${dailyAvgHours}h/day average. Increase tracked time`
+    });
+  } else if (dailyAvgHours > 10) {
+    insights.push({
+      type: 'warning',
+      icon: '🔥',
+      message: `High activity: ${dailyAvgHours}h/day. Consider breaks`
+    });
+  }
+  
+  // Category-specific insights
+  const productiveCategories = ['Development', 'Learning', 'Research', 'Communication'];
+  const distractingCategories = ['Entertainment', 'Social Media', 'News'];
+  
+  let topDistraction = { category: '', time: 0 };
+  let topProductive = { category: '', time: 0 };
+  
+  Object.entries(todayData.timeByCategory).forEach(([category, time]) => {
+    if (distractingCategories.includes(category) && time > topDistraction.time) {
+      topDistraction = { category, time };
+    }
+    if (productiveCategories.includes(category) && time > topProductive.time) {
+      topProductive = { category, time };
+    }
+  });
+  
+  if (topProductive.category) {
+    insights.push({
+      type: 'success',
+      icon: '💪',
+      message: `Top strength: ${topProductive.category} (${Math.round(topProductive.time/1000/60)}min today)`
+    });
+  }
+  
+  if (topDistraction.time > 30 * 60 * 1000) { // More than 30 minutes
+    insights.push({
+      type: 'warning',
+      icon: '⚠️',
+      message: `Top distraction: ${topDistraction.category} (${Math.round(topDistraction.time/1000/60)}min today)`
+    });
+  }
+  
+  displayInsights(insights);
+}
+
+function displayInsights(insights) {
+  let insightsContainer = document.getElementById('insights-container');
+  
+  if (!insightsContainer) {
+    insightsContainer = document.createElement('div');
+    insightsContainer.id = 'insights-container';
+    insightsContainer.className = 'insights-section';
+    
+    // Insert after weekly section
+    const weeklySection = document.querySelector('.weekly-section');
+    if (weeklySection) {
+      weeklySection.insertAdjacentElement('afterend', insightsContainer);
+    }
+  }
+  
+  insightsContainer.innerHTML = `
+    <h3>💡 Insights & Recommendations</h3>
+    <div class="insights-list">
+      ${insights.map(insight => `
+        <div class="insight-item insight-${insight.type}">
+          <span class="insight-icon">${insight.icon}</span>
+          <span class="insight-message">${insight.message}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 // Add modal styles
 const modalStyles = `
+.insights-section {
+  margin-bottom: 20px;
+}
+
+.insights-section h3 {
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.insights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.insight-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  border-left: 3px solid;
+}
+
+.insight-success {
+  background: #f0fdf4;
+  border-left-color: #22c55e;
+  color: #15803d;
+}
+
+.insight-warning {
+  background: #fffbeb;
+  border-left-color: #f59e0b;
+  color: #d97706;
+}
+
+.insight-alert {
+  background: #fef2f2;
+  border-left-color: #ef4444;
+  color: #dc2626;
+}
+
+.insight-info {
+  background: #f0f9ff;
+  border-left-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+.insight-icon {
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+.insight-message {
+  flex: 1;
+  line-height: 1.4;
+}
+
+`
 .report-modal {
   position: fixed;
   top: 0;

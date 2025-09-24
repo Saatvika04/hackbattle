@@ -114,29 +114,62 @@ async function categorizeWebsite(url) {
   if (!url) return 'Other';
 
   try {
-    // 1. Load the user's custom rules from storage
-    const { customRules } = await chrome.storage.sync.get({
-      customRules: [] // Default to an empty array
+    const settings = await chrome.storage.sync.get({
+      customRules: []
     });
 
     const domain = new URL(url).hostname.toLowerCase();
 
-    // 2. Find the first matching rule
-    for (const rule of customRules) {
-      // Convert wildcard patterns to simple includes for now
-      const pattern = rule.pattern.replace('*', '');
-      if (domain.includes(pattern)) {
-        return rule.category; // Return the category from the rule!
+    // Check custom rules first
+    for (const rule of settings.customRules) {
+      if (matchesPattern(domain, rule.pattern)) {
+        return rule.category;
       }
     }
 
-    // 3. If no rule matches, return 'Other'
+    // Default categorization rules
+    const defaultRules = [
+      // Development
+      { patterns: ['github.com', 'stackoverflow.com', 'codepen.io', 'repl.it', 'glitch.com', 'codesandbox.io', 'gitlab.com', 'bitbucket.org'], category: 'Development' },
+      // Learning
+      { patterns: ['coursera.org', 'udemy.com', 'khan.', 'edx.org', 'codecademy.com', 'freecodecamp.org', 'pluralsight.com', 'lynda.com', 'brilliant.org'], category: 'Learning' },
+      // Research
+      { patterns: ['scholar.google', 'researchgate.net', 'arxiv.org', 'jstor.org', 'pubmed.', 'ieee.org', 'acm.org', 'wikipedia.org', 'britannica.com'], category: 'Research' },
+      // Communication
+      { patterns: ['gmail.com', 'outlook.', 'slack.com', 'teams.microsoft.com', 'zoom.us', 'meet.google.com', 'discord.com', 'telegram.', 'whatsapp.'], category: 'Communication' },
+      // Social Media
+      { patterns: ['facebook.com', 'twitter.com', 'instagram.com', 'linkedin.com', 'tiktok.com', 'snapchat.com', 'reddit.com', 'pinterest.com'], category: 'Social Media' },
+      // Entertainment
+      { patterns: ['youtube.com', 'netflix.com', 'hulu.com', 'twitch.tv', 'spotify.com', 'apple.com/music', 'soundcloud.com', 'pandora.com'], category: 'Entertainment' },
+      // News
+      { patterns: ['cnn.com', 'bbc.com', 'nytimes.com', 'reuters.com', 'ap.org', 'npr.org', 'washingtonpost.com', 'theguardian.com'], category: 'News' }
+    ];
+
+    // Check default rules
+    for (const ruleGroup of defaultRules) {
+      for (const pattern of ruleGroup.patterns) {
+        if (matchesPattern(domain, pattern)) {
+          return ruleGroup.category;
+        }
+      }
+    }
     return 'Other';
 
   } catch (error) {
     console.error('Error categorizing website:', error);
     return 'Other';
   }
+}
+
+function matchesPattern(domain, pattern) {
+  // Convert pattern to regex
+  const regexPattern = pattern
+    .replace(/\./g, '\\.')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+    
+  const regex = new RegExp(regexPattern, 'i');
+  return regex.test(domain);
 }
 
 function calculateFocusScore(timeByCategory) {
@@ -251,13 +284,45 @@ function createWeeklyReport(weekData) {
     });
   });
 
+  // Enhanced analysis
+  const productiveCategories = ['Development', 'Learning', 'Research', 'Communication'];
   const distractingCategories = ['Entertainment', 'Social Media', 'News'];
+  
+  let productiveTime = 0;
+  let distractingTime = 0;
   let topDistraction = { category: 'None', time: 0 };
+  let topProductive = { category: 'None', time: 0 };
 
   Object.entries(categoryTotals).forEach(([category, time]) => {
-    if (distractingCategories.includes(category) && time > topDistraction.time) {
-      topDistraction = { category, time };
+    if (productiveCategories.includes(category)) {
+      productiveTime += time;
+      if (time > topProductive.time) {
+        topProductive = { category, time };
+      }
+    } else if (distractingCategories.includes(category)) {
+      distractingTime += time;
+      if (time > topDistraction.time) {
+        topDistraction = { category, time };
+      }
     }
+  });
+
+  // Calculate trends
+  const dailyScores = weekData.map((day) => day.focusScore);
+  const trend = calculateTrend(dailyScores);
+  const streaks = calculateStreaks(dailyScores);
+  
+  // Generate insights
+  const insights = generateInsights({
+    averageFocusScore,
+    productiveTime,
+    distractingTime,
+    totalTime,
+    topDistraction,
+    topProductive,
+    trend,
+    streaks,
+    categoryTotals
   });
 
   return {
@@ -267,8 +332,116 @@ function createWeeklyReport(weekData) {
     averageFocusScore,
     categoryTotals,
     topDistraction,
-    dailyScores: weekData.map((day) => day.focusScore),
+    topProductive,
+    productiveTime: Math.round(productiveTime / 1000 / 60),
+    distractingTime: Math.round(distractingTime / 1000 / 60),
+    dailyScores,
+    trend,
+    streaks,
+    insights
   };
+}
+
+function calculateTrend(scores) {
+  if (scores.length < 2) return 'stable';
+  
+  const firstHalf = scores.slice(0, Math.floor(scores.length / 2));
+  const secondHalf = scores.slice(Math.floor(scores.length / 2));
+  
+  const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+  const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+  
+  const difference = secondAvg - firstAvg;
+  
+  if (difference > 5) return 'improving';
+  if (difference < -5) return 'declining';
+  return 'stable';
+}
+
+function calculateStreaks(scores) {
+  let currentStreak = 0;
+  let bestStreak = 0;
+  const threshold = 70; // Focus score threshold for "good" days
+  
+  for (let i = scores.length - 1; i >= 0; i--) {
+    if (scores[i] >= threshold) {
+      currentStreak++;
+      bestStreak = Math.max(bestStreak, currentStreak);
+    } else {
+      if (currentStreak > 0) break; // Stop counting current streak
+    }
+  }
+  
+  return { current: currentStreak, best: bestStreak };
+}
+
+function generateInsights(data) {
+  const insights = [];
+  const { averageFocusScore, productiveTime, distractingTime, totalTime, topDistraction, topProductive, trend, streaks } = data;
+  
+  // Focus score insights
+  if (averageFocusScore >= 80) {
+    insights.push({
+      type: 'success',
+      title: 'Excellent Focus!',
+      message: `Your average focus score of ${averageFocusScore}% is outstanding. Keep up the great work!`,
+      action: 'Continue your current productivity habits'
+    });
+  } else if (averageFocusScore >= 60) {
+    insights.push({
+      type: 'warning',
+      title: 'Room for Improvement',
+      message: `Your focus score of ${averageFocusScore}% is decent, but you can do better.`,
+      action: `Try reducing time on ${topDistraction.category} by 15 minutes daily`
+    });
+  } else {
+    insights.push({
+      type: 'alert',
+      title: 'Focus Needs Attention',
+      message: `Your focus score of ${averageFocusScore}% indicates significant distractions.`,
+      action: `Consider blocking ${topDistraction.category} during work hours`
+    });
+  }
+  
+  // Trend insights
+  if (trend === 'improving') {
+    insights.push({
+      type: 'success',
+      title: 'Positive Trend!',
+      message: 'Your focus is improving throughout the week.',
+      action: 'Identify what changed and maintain these habits'
+    });
+  } else if (trend === 'declining') {
+    insights.push({
+      type: 'warning',
+      title: 'Declining Focus',
+      message: 'Your focus decreased as the week progressed.',
+      action: 'Review your schedule and identify stress factors'
+    });
+  }
+  
+  // Streak insights
+  if (streaks.current >= 3) {
+    insights.push({
+      type: 'success',
+      title: `${streaks.current}-Day Focus Streak!`,
+      message: 'You\'re on a roll with consistent high focus scores.',
+      action: 'Challenge yourself to extend this streak'
+    });
+  }
+  
+  // Time allocation insights
+  const productivePercentage = (productiveTime / totalTime) * 100;
+  if (productivePercentage < 30) {
+    insights.push({
+      type: 'alert',
+      title: 'Low Productive Time',
+      message: `Only ${productivePercentage.toFixed(1)}% of your time was spent productively.`,
+      action: `Increase ${topProductive.category} activities by 30 minutes daily`
+    });
+  }
+  
+  return insights;
 }
 
 function getNextMidnight() {
