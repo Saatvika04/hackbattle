@@ -62,6 +62,26 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'USER_INACTIVE') {
+    // User is idle. Finalize the last session and pause tracking.
+    console.log('User inactive, pausing tracking.');
+    updateTimeTracking(); // Save the time spent before becoming inactive
+    currentUrl = null;    // Pause tracking by clearing the current URL
+  } else if (message.type === 'USER_ACTIVE') {
+    // User is active again. Resume tracking.
+    console.log('User active, resuming tracking.');
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        currentTabId = tabs[0].id;
+        currentUrl = tabs[0].url;
+        sessionStart = Date.now(); // Start a new session
+      }
+    });
+  }
+  return true; // Keep the message channel open for async response
+});
+
 async function updateTimeTracking() {
   if (!currentUrl || !sessionStart) return;
 
@@ -94,22 +114,25 @@ async function categorizeWebsite(url) {
   if (!url) return 'Other';
 
   try {
-    const settings = await chrome.storage.sync.get({
-      productiveSites: ['github.com', 'stackoverflow.com'], // Default values
-      distractingSites: ['youtube.com', 'facebook.com'], // Default values
+    // 1. Load the user's custom rules from storage
+    const { customRules } = await chrome.storage.sync.get({
+      customRules: [] // Default to an empty array
     });
 
     const domain = new URL(url).hostname.toLowerCase();
 
-    if (settings.productiveSites.some((site) => domain.includes(site))) {
-      return 'Productive';
+    // 2. Find the first matching rule
+    for (const rule of customRules) {
+      // Convert wildcard patterns to simple includes for now
+      const pattern = rule.pattern.replace('*', '');
+      if (domain.includes(pattern)) {
+        return rule.category; // Return the category from the rule!
+      }
     }
 
-    if (settings.distractingSites.some((site) => domain.includes(site))) {
-      return 'Distracting';
-    }
-
+    // 3. If no rule matches, return 'Other'
     return 'Other';
+
   } catch (error) {
     console.error('Error categorizing website:', error);
     return 'Other';
