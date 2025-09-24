@@ -11,6 +11,13 @@ import {
 } from "recharts";
 import "./main.css";
 
+// Declare chrome namespace
+declare global {
+  interface Window {
+    chrome: typeof chrome;
+  }
+}
+
 // Dummy weekly data (frontend only)
 const weeklyData = [
   { day: "Mon", hours: 2 },
@@ -25,19 +32,50 @@ const weeklyData = [
 function App() {
   const [task, setTask] = useState("");
   const [duration, setDuration] = useState("");
+  const [isStarting, setIsStarting] = useState(false);
 
-  const handleStart = (e: React.FormEvent) => {
+  const handleStart = async (e: React.FormEvent) => {
     e.preventDefault();
-        alert(`LockedIn!
-    Task: ${task}
-    Duration: ${duration} minutes`);
+    
+    // Check if running in Chrome extension context
+    if (typeof window.chrome?.runtime?.sendMessage === 'undefined') {
+      console.error('Not running in Chrome extension context');
+      alert('This app must be run as a Chrome extension');
+      return;
+    }
+
+    setIsStarting(true);
+    try {
+      const response = await window.chrome.runtime.sendMessage({
+        type: 'START_SESSION',
+        task: task,
+        duration: parseInt(duration)
+      });
+
+      if (response?.success) {
+        // Clear the form
+        setTask('');
+        setDuration('');
+        // Show success message to user
+        alert('Focus session started!');
+      } else {
+        alert('Failed to start session. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error starting session:', error);
+      alert('Error starting session. Please try again.');
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-8">
         {/* App Name */}
-        <h1 className="text-5xl font-bold text-blue-600 text-center">LockedIn</h1>
+        <h1 className="text-5xl font-bold text-blue-600 text-center">
+          LockedIn
+        </h1>
 
         {/* Task & Duration Form */}
         <form onSubmit={handleStart} className="space-y-4">
@@ -74,9 +112,12 @@ function App() {
           {/* Start/Schedule Button */}
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition"
+            disabled={isStarting}
+            className={`w-full bg-blue-600 text-white py-3 rounded-xl font-semibold transition ${
+              isStarting ? 'opacity-75 cursor-not-allowed' : 'hover:bg-blue-700'
+            }`}
           >
-            Start / Schedule Focus Time
+            {isStarting ? 'Starting Session...' : 'Start / Schedule Focus Time'}
           </button>
         </form>
 
@@ -86,7 +127,10 @@ function App() {
             Weekly Report
           </h2>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={weeklyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+            <BarChart
+              data={weeklyData}
+              margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+            >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="day" />
               <YAxis />

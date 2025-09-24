@@ -4,6 +4,9 @@ let currentUrl = null;
 let sessionStart = Date.now();
 let dailyData = {};
 
+// Basic state management
+let currentSession = null;
+
 // Initialize extension
 chrome.runtime.onInstalled.addListener(() => {
   console.log('FocusTracker installed');
@@ -56,6 +59,25 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       await processDailyReset();
     } else if (alarm.name === 'weeklyReport') {
       await generateWeeklyReport();
+    } else if (alarm.name === 'focusTimer') {
+      try {
+        const data = await chrome.storage.local.get('currentSession');
+        if (!data.currentSession?.isActive) {
+          chrome.alarms.clear('focusTimer');
+          return;
+        }
+
+        const timeLeft = Math.max(0, Math.round((data.currentSession.endTime - Date.now()) / 1000));
+        console.log('Time left:', timeLeft);
+
+        if (timeLeft <= 0) {
+          await endSession();
+        } else {
+          await updateSessionTime(timeLeft);
+        }
+      } catch (error) {
+        console.error('Error in timer tick:', error);
+      }
     }
   } catch (error) {
     console.error('Error handling alarm:', error);
@@ -78,6 +100,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sessionStart = Date.now(); // Start a new session
       }
     });
+  } else if (message.type === 'START_SESSION') {
+    console.log('Received start session request:', message);
+    startNewSession(message.task, message.duration)
+      .then(success => sendResponse({ success }));
   }
   return true; // Keep the message channel open for async response
 });
@@ -459,3 +485,71 @@ function getNextSunday9AM() {
   nextSunday.setHours(9, 0, 0, 0);
   return nextSunday.getTime();
 }
+
+async function startNewSession(task, duration) {
+  try {
+    const sessionData = {
+      isActive: true,
+      task: task,
+      duration: duration,
+      timeLeft: duration * 60, // in seconds
+      startTime: Date.now(),
+      endTime: Date.now() + duration * 60 * 1000
+    };
+
+    await chrome.storage.local.set({ currentSession: sessionData });
+    
+    // Create the timer
+    await chrome.alarms.create('focusTimer', {
+      periodInMinutes: 1
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error starting session:', error);
+    return false;
+  }
+}
+
+async function endSession() {
+  try {
+    const data = await chrome.storage.local.get('currentSession');
+    if (!data.currentSession) return;
+
+    // Save session statistics
+    const stats = {
+      task: data.currentSession.task,
+      duration: data.currentSession.duration,
+      completedAt: new Date().toISOString()
+    };
+
+    // Clear current session
+    await chrome.storage.local.remove('currentSession');
+    await chrome.alarms.clear('focusTimer');
+
+    // Show notification
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon48.png',
+      title: 'Focus Session Complete!',
+      message: `Completed: ${stats.task}`
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error ending session:', error);
+    return false;
+  }
+}
+
+async function updateSessionTime(timeLeft) {
+  try {
+    const minutes = Math.ceil(timeLeft / 60).toString();
+    await chrome.action.setBadgeText({ text: minutes });
+    await chrome.action.setBadgeBackgroundColor({ color: '#3b82f6' });
+  } catch (error) {
+    console.error('Error updating badge:', error);
+  }
+}
+
+//# sourceMappingURL=background.js.map
