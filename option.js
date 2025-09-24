@@ -1,7 +1,12 @@
 // Options page script for FocusTracker
 document.addEventListener('DOMContentLoaded', async () => {
-  await loadSettings();
-  setupEventListeners();
+  try {
+    await loadSettings();
+    setupEventListeners();
+    console.log('Options page loaded successfully');
+  } catch (error) {
+    console.error('Error loading options page:', error);
+  }
 });
 
 async function loadSettings() {

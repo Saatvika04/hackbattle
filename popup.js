@@ -32,6 +32,11 @@ function updateFocusScore(score) {
   const messageElement = document.getElementById('focusMessage');
   const scoreCircle = document.querySelector('.score-circle');
   
+  if (!scoreElement || !messageElement || !scoreCircle) {
+    console.error('Missing required DOM elements for focus score display');
+    return;
+  }
+  
   scoreElement.textContent = score;
   
   // Update progress circle
@@ -61,6 +66,11 @@ function updateTimeStats(todayData) {
   const totalTimeElement = document.getElementById('totalTime');
   const productiveTimeElement = document.getElementById('productiveTime');
 
+  if (!totalTimeElement || !productiveTimeElement) {
+    console.error('Missing required DOM elements for time stats display');
+    return;
+  }
+
   // This part is fine
   const totalMinutes = Math.round(todayData.totalTime / 1000 / 60);
   totalTimeElement.textContent = formatTime(totalMinutes);
@@ -86,8 +96,19 @@ function updateTimeStats(todayData) {
 }
 
 function createTimeChart(timeByCategory) {
-  const ctx = document.getElementById('timeChart').getContext('2d');
+  const timeChartElement = document.getElementById('timeChart');
+  const ctx = timeChartElement ? timeChartElement.getContext('2d') : null;
   const noDataElement = document.getElementById('noDataMessage');
+  
+  if (!ctx) {
+    console.error('Chart canvas element not found');
+    return;
+  }
+  
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js library not loaded');
+    return;
+  }
   
   const hasData = Object.keys(timeByCategory).length > 0;
   
@@ -207,7 +228,18 @@ function updateWeeklyStats(weekData) {
 }
 
 function createWeeklyChart(weekData) {
-  const ctx = document.getElementById('weeklyChart').getContext('2d');
+  const weeklyChartElement = document.getElementById('weeklyChart');
+  const ctx = weeklyChartElement ? weeklyChartElement.getContext('2d') : null;
+  
+  if (!ctx) {
+    console.error('Weekly chart canvas element not found');
+    return;
+  }
+  
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js library not loaded');
+    return;
+  }
   
   if (weeklyChart) {
     weeklyChart.destroy();
@@ -262,19 +294,44 @@ function createWeeklyChart(weekData) {
 }
 
 function setupEventListeners() {
-  document.getElementById('settingsBtn').addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
-  });
+  // Settings button
+  const settingsBtn = document.getElementById('settingsBtn');
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', () => {
+      try {
+        chrome.runtime.openOptionsPage();
+      } catch (error) {
+        console.error('Error opening options page:', error);
+        // Fallback: open in new tab
+        chrome.tabs.create({ url: chrome.runtime.getURL('options.html') });
+      }
+    });
+  }
   
-  document.getElementById('viewReportBtn').addEventListener('click', async () => {
-    // Generate and show weekly report
-    const report = await generateWeeklyReport();
-    showWeeklyReportModal(report);
-  });
+  // View report button
+  const viewReportBtn = document.getElementById('viewReportBtn');
+  if (viewReportBtn) {
+    viewReportBtn.addEventListener('click', async () => {
+      try {
+        const report = await generateWeeklyReport();
+        showWeeklyReportModal(report);
+      } catch (error) {
+        console.error('Error generating weekly report:', error);
+      }
+    });
+  }
   
-  document.getElementById('exportDataBtn').addEventListener('click', async () => {
-    await exportUserData();
-  });
+  // Export data button
+  const exportDataBtn = document.getElementById('exportDataBtn');
+  if (exportDataBtn) {
+    exportDataBtn.addEventListener('click', async () => {
+      try {
+        await exportUserData();
+      } catch (error) {
+        console.error('Error exporting data:', error);
+      }
+    });
+  }
 }
 
 async function generateWeeklyReport() {
@@ -324,12 +381,12 @@ function showWeeklyReportModal(report) {
           ${Object.entries(report.categoryTotals)
             .sort(([,a], [,b]) => b - a)
             .slice(0, 5)
-            .map(([category, time]) => `
-              <div class="category-item">
-                <span class="category-name">${category}</span>
-                <span class="category-time">${formatTime(Math.round(time / 1000 / 60))}</span>
-              </div>
-            `).join('')}
+            .map(([category, time]) => 
+              '<div class="category-item">' +
+                '<span class="category-name">' + category + '</span>' +
+                '<span class="category-time">' + formatTime(Math.round(time / 1000 / 60)) + '</span>' +
+              '</div>'
+            ).join('')}
         </div>
       </div>
     </div>
@@ -379,7 +436,8 @@ function formatTime(minutes) {
 function generateDailyInsights(weekData, avgFocus, totalMinutes) {
   const insights = [];
   const today = new Date().toDateString();
-  const todayData = weekData.find(day => day.date === today)?.data || { focusScore: 100, timeByCategory: {} };
+  const todayDataEntry = weekData.find(day => day.date === today);
+  const todayData = todayDataEntry ? todayDataEntry.data : { focusScore: 100, timeByCategory: {} };
   
   // Focus score insights
   if (avgFocus >= 80) {
@@ -470,165 +528,28 @@ function displayInsights(insights) {
   
   insightsContainer.innerHTML = `
     <h3>💡 Insights & Recommendations</h3>
-    <div class="insights-list">
-      ${insights.map(insight => `
-        <div class="insight-item insight-${insight.type}">
-          <span class="insight-icon">${insight.icon}</span>
-          <span class="insight-message">${insight.message}</span>
-        </div>
-      `).join('')}
-    </div>
+    <div class="insights-list"></div>
   `;
+
+  const list = insightsContainer.querySelector('.insights-list');
+  list.innerHTML = '';
+  for (var i = 0; i < insights.length; i++) {
+    var insight = insights[i];
+    var item = document.createElement('div');
+    item.className = 'insight-item insight-' + insight.type;
+
+    var iconSpan = document.createElement('span');
+    iconSpan.className = 'insight-icon';
+    iconSpan.textContent = insight.icon;
+
+    var messageSpan = document.createElement('span');
+    messageSpan.className = 'insight-message';
+    messageSpan.textContent = insight.message;
+
+    item.appendChild(iconSpan);
+    item.appendChild(messageSpan);
+    list.appendChild(item);
+  }
 }
 
-// Add modal styles
-const modalStyles = `
-.insights-section {
-  margin-bottom: 20px;
-}
 
-.insights-section h3 {
-  font-size: 16px;
-  margin-bottom: 12px;
-  color: #333;
-}
-
-.insights-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.insight-item {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  border-left: 3px solid;
-}
-
-.insight-success {
-  background: #f0fdf4;
-  border-left-color: #22c55e;
-  color: #15803d;
-}
-
-.insight-warning {
-  background: #fffbeb;
-  border-left-color: #f59e0b;
-  color: #d97706;
-}
-
-.insight-alert {
-  background: #fef2f2;
-  border-left-color: #ef4444;
-  color: #dc2626;
-}
-
-.insight-info {
-  background: #f0f9ff;
-  border-left-color: #3b82f6;
-  color: #1d4ed8;
-}
-
-.insight-icon {
-  margin-right: 8px;
-  font-size: 14px;
-}
-
-.insight-message {
-  flex: 1;
-  line-height: 1.4;
-}
-
-`
-.report-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 400px;
-  max-height: 80%;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-}
-
-.modal-body {
-  padding: 20px;
-}
-
-.report-stat {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.report-value {
-  display: block;
-  font-size: 32px;
-  font-weight: 700;
-  color: #667eea;
-}
-
-.report-label {
-  font-size: 14px;
-  color: #666;
-}
-
-.category-breakdown h3 {
-  font-size: 16px;
-  margin-bottom: 15px;
-}
-
-.category-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.category-name {
-  font-weight: 500;
-}
-
-.category-time {
-  color: #666;
-}
-`;
-
-const style = document.createElement('style');
-style.textContent = modalStyles;
-document.head.appendChild(style);
