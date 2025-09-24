@@ -15,7 +15,12 @@ function updateActivity() {
   lastActivity = Date.now();
   if (!isActive) {
     isActive = true;
-    chrome.runtime.sendMessage({ type: 'USER_ACTIVE' });
+    try {
+      chrome.runtime.sendMessage({ type: 'USER_ACTIVE' });
+    } catch (error) {
+      // Extension context invalidated, ignore error
+      console.debug('Extension context invalidated:', error);
+    }
   }
 }
 
@@ -25,14 +30,24 @@ function checkInactivity() {
   
   if (inactiveTime > inactiveThreshold && isActive) {
     isActive = false;
-    chrome.runtime.sendMessage({ type: 'USER_INACTIVE', inactiveTime });
+    try {
+      chrome.runtime.sendMessage({ type: 'USER_INACTIVE', inactiveTime });
+    } catch (error) {
+      // Extension context invalidated, ignore error
+      console.debug('Extension context invalidated:', error);
+    }
   }
 }
 
 // Send page view event
-chrome.runtime.sendMessage({
-  type: 'PAGE_VIEW',
-  url: window.location.href,
-  title: document.title,
-  timestamp:    Date.now()
-});
+try {
+  chrome.runtime.sendMessage({
+    type: 'PAGE_VIEW',
+    url: window.location.href,
+    title: document.title,
+    timestamp: Date.now()
+  });
+} catch (error) {
+  // Extension context invalidated, ignore error
+  console.debug('Extension context invalidated:', error);
+}
