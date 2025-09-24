@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusTracker Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">🎯</div>
+        <h1>FocusTracker Settings</h1>
+      </div>
+    </header>
+
+    <div class="content">
+      <section class="settings-section">
+        <h2>📊 Reports & Notifications</h2>
+        
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Weekly Email Reports</h3>
+            <p>Receive a summary of your focus score and time allocation every Sunday</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle">
+              <input type="checkbox" id="weeklyReports" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-item" id="emailSettings">
+          <div class="setting-info">
+            <h3>Email Address</h3>
+            <p>Where should we send your weekly reports?</p>
+          </div>
+          <div class="setting-control">
+            <input type="email" id="emailAddress" placeholder="your@email.com" class="email-input">
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Daily Focus Goal</h3>
+            <p>Set your target focus score for each day</p>
+          </div>
+          <div class="setting-control">
+            <div class="range-input">
+              <input type="range" id="focusGoal" min="50" max="100" value="80">
+              <span id="focusGoalValue">80%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>🏷 Website Categories</h2>
+        <p class="section-description">Customize how websites are categorized for better tracking</p>
+        
+        <div class="categories-grid">
+          <div class="category-card productive">
+            <h3>🎯 Productive</h3>
+            <div class="category-tags">
+              <span class="tag">Development</span>
+              <span class="tag">Learning</span>
+              <span class="tag">Research</span>
+              <span class="tag">Communication</span>
+            </div>
+            <button class="edit-btn" data-category="productive">Edit</button>
+          </div>
+          
+          <div class="category-card distracting">
+            <h3>⚠ Distracting</h3>
+            <div class="category-tags">
+              <span class="tag">Social Media</span>
+              <span class="tag">Entertainment</span>
+              <span class="tag">News</span>
+            </div>
+            <button class="edit-btn" data-category="distracting">Edit</button>
+          </div>
+        </div>
+
+        <div class="custom-rules">
+          <h3>Custom Rules</h3>
+          <div id="customRulesList"></div>
+          <button id="addRuleBtn" class="add-btn">+ Add Custom Rule</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>🕒 Tracking Preferences</h2>
+        
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Track Inactive Time</h3>
+            <p>Include time when you're away from the computer</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle">
+              <input type="checkbox" id="trackInactive">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Minimum Session Time</h3>
+            <p>Ignore sessions shorter than this duration</p>
+          </div>
+          <div class="setting-control">
+            <select id="minSessionTime" class="select-input">
+              <option value="0">No minimum</option>
+              <option value="5" selected>5 seconds</option>
+              <option value="10">10 seconds</option>
+              <option value="30">30 seconds</option>
+              <option value="60">1 minute</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>🔒 Privacy & Data</h2>
+        
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Data Retention</h3>
+            <p>How long to keep your tracking data</p>
+          </div>
+          <div class="setting-control">
+            <select id="dataRetention" class="select-input">
+              <option value="30">30 days</option>
+              <option value="90" selected>90 days</option>
+              <option value="365">1 year</option>
+              <option value="0">Forever</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="data-actions">
+          <button id="exportBtn" class="action-btn secondary">
+            💾 Export All Data
+          </button>
+          <button id="clearDataBtn" class="action-btn danger">
+            🗑 Clear All Data
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <footer class="footer">
+      <div class="save-actions">
+        <button id="resetBtn" class="action-btn secondary">Reset to Defaults</button>
+        <button id="saveBtn" class="action-btn primary">Save Settings</button>
+      </div>
+      <p class="version">FocusTracker v1.0.0</p>
+    </footer>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
