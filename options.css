@@ -158,6 +158,7 @@ input:checked + .slider:before {
   background: #ddd;
   outline: none;
   -webkit-appearance: none;
+  appearance: none;
 }
 
 .range-input input[type="range"]::-webkit-slider-thumb {
