@@ -51,11 +51,16 @@ function setupEventListeners() {
     showCustomRuleModal();
   });
 
-  // Action buttons
-  document.getElementById('saveBtn').addEventListener('click', saveSettings);
-  document.getElementById('resetBtn').addEventListener('click', resetSettings);
-  document.getElementById('exportBtn').addEventListener('click', exportData);
-  document.getElementById('clearDataBtn').addEventListener('click', clearAllData);
+  // Action buttons - check if elements exist first
+  const saveBtn = document.getElementById('saveBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  const clearDataBtn = document.getElementById('clearDataBtn');
+  
+  if (saveBtn) saveBtn.addEventListener('click', saveSettings);
+  if (resetBtn) resetBtn.addEventListener('click', resetSettings);
+  if (exportBtn) exportBtn.addEventListener('click', exportData);
+  if (clearDataBtn) clearDataBtn.addEventListener('click', clearAllData);
 
   // Category edit buttons
   document.querySelectorAll('.edit-btn').forEach(btn => {
@@ -98,6 +103,12 @@ function createCustomRuleElement(rule, index) {
       <button class="delete-rule-btn" data-index="${index}">Delete</button>
     </div>
   `;
+  
+  // Add event listeners
+  div.querySelector('.edit-rule-btn').addEventListener('click', () => editCustomRule(index));
+  div.querySelector('.delete-rule-btn').addEventListener('click', () => deleteCustomRule(index));
+  
+  return div;
 
   // Add event listeners for rule actions
   div.querySelector('.edit-rule-btn').addEventListener('click', () => editCustomRule(index));
