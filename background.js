@@ -62,6 +62,26 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'USER_INACTIVE') {
+    // User is idle. Finalize the last session and pause tracking.
+    console.log('User inactive, pausing tracking.');
+    updateTimeTracking(); // Save the time spent before becoming inactive
+    currentUrl = null;    // Pause tracking by clearing the current URL
+  } else if (message.type === 'USER_ACTIVE') {
+    // User is active again. Resume tracking.
+    console.log('User active, resuming tracking.');
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        currentTabId = tabs[0].id;
+        currentUrl = tabs[0].url;
+        sessionStart = Date.now(); // Start a new session
+      }
+    });
+  }
+  return true; // Keep the message channel open for async response
+});
+
 async function updateTimeTracking() {
   if (!currentUrl || !sessionStart) return;
 
@@ -133,8 +153,8 @@ async function categorizeWebsite(url) {
         }
       }
     }
-
     return 'Other';
+
   } catch (error) {
     console.error('Error categorizing website:', error);
     return 'Other';
