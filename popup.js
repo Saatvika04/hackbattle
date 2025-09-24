@@ -62,6 +62,8 @@ function updateFocusScore(score) {
   messageElement.textContent = message;
 }
 
+// --- Replace the entire old function with this new one ---
+
 function updateTimeStats(todayData) {
   const totalTimeElement = document.getElementById('totalTime');
   const productiveTimeElement = document.getElementById('productiveTime');
@@ -71,23 +73,17 @@ function updateTimeStats(todayData) {
     return;
   }
 
-  // This part is fine
   const totalMinutes = Math.round(todayData.totalTime / 1000 / 60);
   totalTimeElement.textContent = formatTime(totalMinutes);
 
-  // --- FIX STARTS HERE ---
+  // Define the single source of truth for productive categories
+  const productiveCategories = ['Development', 'Learning', 'Research', 'Communication'];
+  
   let productiveMinutes = 0;
 
-  // Instead of a hardcoded list, check for the specific categories
-  // that you have defined as productive in your settings.
-  const productiveCategoriesFromSettings = [
-    'Development', 'Learning', 'Research', 'Communication'
-    // This list should ideally be loaded from storage as well,
-    // but for now, we'll keep it consistent with your calculateFocusScore function.
-  ];
-
+  // Calculate productive time based on the same list used by the background script
   Object.entries(todayData.timeByCategory).forEach(([category, time]) => {
-    if (productiveCategoriesFromSettings.includes(category)) {
+    if (productiveCategories.includes(category)) {
       productiveMinutes += Math.round(time / 1000 / 60);
     }
   });
