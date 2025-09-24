@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusTracker</title>
+  <link rel="stylesheet" href="popup.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">🎯</div>
+        <h1>FocusTracker</h1>
+      </div>
+      <button id="settingsBtn" class="settings-btn">⚙️</button>
+    </header>
+
+    <div class="focus-score-section">
+      <div class="focus-score-card">
+        <div class="score-circle">
+          <div class="score-text">
+            <span id="focusScore">--</span>
+            <small>%</small>
+          </div>
+        </div>
+        <h2>Today's Focus Score</h2>
+        <p id="focusMessage">Calculating your focus...</p>
+      </div>
+    </div>
+
+    <div class="stats-section">
+      <div class="stat-card">
+        <div class="stat-icon">⏱️</div>
+        <div class="stat-content">
+          <span class="stat-value" id="totalTime">0h 0m</span>
+          <span class="stat-label">Total Time</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🎯</div>
+        <div class="stat-content">
+          <span class="stat-value" id="productiveTime">0h 0m</span>
+          <span class="stat-label">Productive</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-section">
+      <h3>Time Allocation Today</h3>
+      <div class="chart-container">
+        <canvas id="timeChart"></canvas>
+      </div>
+      <div id="noDataMessage" class="no-data hidden">
+        <p>Start browsing to see your time allocation!</p>
+      </div>
+    </div>
+
+    <div class="weekly-section">
+      <h3>Weekly Overview</h3>
+      <div class="week-stats">
+        <div class="week-stat">
+          <span class="week-value" id="weekFocusScore">--</span>
+          <span class="week-label">Avg Focus</span>
+        </div>
+        <div class="week-stat">
+          <span class="week-value" id="weekTotalTime">0h</span>
+          <span class="week-label">Total Time</span>
+        </div>
+      </div>
+      <div class="weekly-chart-container">
+        <canvas id="weeklyChart"></canvas>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="viewReportBtn" class="action-btn primary">
+        📊 View Weekly Report
+      </button>
+      <button id="exportDataBtn" class="action-btn secondary">
+        💾 Export Data
+      </button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
