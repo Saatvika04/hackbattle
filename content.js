@@ -8,6 +8,18 @@ document.addEventListener('keypress', updateActivity);
 document.addEventListener('scroll', updateActivity);
 document.addEventListener('click', updateActivity);
 
+// Helper function to safely send messages
+function safeSendMessage(message) {
+  if (chrome.runtime && chrome.runtime.id) {
+    try {
+      chrome.runtime.sendMessage(message);
+    } catch (error) {
+      // Extension context invalidated, ignore error
+      console.debug('Extension context invalidated:', error);
+    }
+  }
+}
+
 // Check for inactivity every 30 seconds
 setInterval(checkInactivity, 30000);
 
@@ -15,12 +27,7 @@ function updateActivity() {
   lastActivity = Date.now();
   if (!isActive) {
     isActive = true;
-    try {
-      chrome.runtime.sendMessage({ type: 'USER_ACTIVE' });
-    } catch (error) {
-      // Extension context invalidated, ignore error
-      console.debug('Extension context invalidated:', error);
-    }
+    safeSendMessage({ type: 'USER_ACTIVE' });
   }
 }
 
@@ -30,24 +37,14 @@ function checkInactivity() {
   
   if (inactiveTime > inactiveThreshold && isActive) {
     isActive = false;
-    try {
-      chrome.runtime.sendMessage({ type: 'USER_INACTIVE', inactiveTime });
-    } catch (error) {
-      // Extension context invalidated, ignore error
-      console.debug('Extension context invalidated:', error);
-    }
+    safeSendMessage({ type: 'USER_INACTIVE', inactiveTime });
   }
 }
 
 // Send page view event
-try {
-  chrome.runtime.sendMessage({
-    type: 'PAGE_VIEW',
-    url: window.location.href,
-    title: document.title,
-    timestamp: Date.now()
-  });
-} catch (error) {
-  // Extension context invalidated, ignore error
-  console.debug('Extension context invalidated:', error);
-}
+safeSendMessage({
+  type: 'PAGE_VIEW',
+  url: window.location.href,
+  title: document.title,
+  timestamp: Date.now()
+});
