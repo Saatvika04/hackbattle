@@ -200,7 +200,7 @@ async function editCustomRule(index) {
 
 function editCategory(categoryType) {
   // This would open a more advanced editor for predefined categories
-  alert(Category editing for ${categoryType} categories will be available in a future update!);
+  alert(`Category editing for ${categoryType} categories will be available in a future update!`);
 }
 
 async function saveSettings() {
@@ -259,7 +259,7 @@ async function exportData() {
     const url = URL.createObjectURL(dataBlob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = focustracker-export-${new Date().toISOString().split('T')[0]}.json;
+    a.download = `focustracker-export-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     
     URL.revokeObjectURL(url);
@@ -286,7 +286,7 @@ async function clearAllData() {
 
 function showNotification(message, type = 'info') {
   const notification = document.createElement('div');
-  notification.className = notification notification-${type};
+  notification.className = `notification notification-${type}`;
   notification.textContent = message;
   
   document.body.appendChild(notification);
