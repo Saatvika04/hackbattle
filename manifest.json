@@ -12,7 +12,8 @@
       "notifications",
       "idle",
       "scripting",
-      "declarativeNetRequest"
+      "declarativeNetRequest",
+      "webNavigation"
     ],
     "host_permissions": [
       "<all_urls>",

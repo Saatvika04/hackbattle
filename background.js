@@ -198,6 +198,9 @@ function clearRelevanceCache() {
 // Clear cache every hour
 chrome.alarms.create('clearRelevanceCache', { periodInMinutes: 60 });
 
+// Sample focus relevance every minute while a task is active
+chrome.alarms.create('sampleRelevance', { periodInMinutes: 1 });
+
 // Enhanced tab change handler with behavioral tracking
 chrome.tabs.onActivated.addListener(function(activeInfo) {
   chrome.tabs.get(activeInfo.tabId, function(tab) {
@@ -457,6 +460,8 @@ chrome.alarms.onAlarm.addListener(function(alarm) {
     });
   } else if (alarm && alarm.name === 'clearRelevanceCache') {
     clearRelevanceCache();
+  } else if (alarm && alarm.name === 'sampleRelevance') {
+    sampleActiveTabRelevance();
   }
 });
 
@@ -477,3 +482,99 @@ function rescheduleTaskEndIfNeeded() {
 }
 
 rescheduleTaskEndIfNeeded();
+
+// ===== Search query extraction and relevance sampling =====
+function parseSearchQuery(urlString) {
+  try {
+    var url = new URL(urlString);
+    var host = url.hostname.replace('www.', '');
+    var params = url.searchParams;
+    var q = '';
+    if (host.includes('google.')) q = params.get('q') || '';
+    else if (host.includes('bing.com')) q = params.get('q') || '';
+    else if (host.includes('duckduckgo.com')) q = params.get('q') || '';
+    else if (host.includes('search.brave.com')) q = params.get('q') || '';
+    return q;
+  } catch (e) { return ''; }
+}
+
+function logSearchIfAny(tab) {
+  var query = parseSearchQuery(tab.url || '');
+  if (!query) return;
+  var todayKey = new Date().toDateString();
+  chrome.storage.local.get([todayKey], function(res) {
+    var day = res[todayKey] || {};
+    var searches = day.searches || [];
+    searches.push({ t: Date.now(), q: query, url: tab.url });
+    day.searches = searches;
+    chrome.storage.local.set({ [todayKey]: day });
+  });
+}
+
+var lastSearchNotifyAt = 0;
+function maybeNotifySearchDistraction(query, callbackDone) {
+  chrome.storage.local.get(['currentSessionCategory', 'isTaskActive'], function(res) {
+    if (!res.isTaskActive) { if (callbackDone) callbackDone(); return; }
+    var sessionCategory = res.currentSessionCategory || 'work';
+    // Quick keyword-based relevance check for the query text
+    var relevance = checkRelevanceWithKeywords(query, query, sessionCategory);
+    if (!relevance.isRelevant) {
+      var now = Date.now();
+      if (now - lastSearchNotifyAt > 30000) { // throttle 30s
+        lastSearchNotifyAt = now;
+        try {
+          chrome.notifications.create('lockedin-search-alert-' + now, {
+            type: 'basic',
+            iconUrl: 'icons/icon128.png',
+            title: 'Stay focused?',
+            message: 'This search may be off-task: "' + (query.length > 80 ? (query.slice(0,77) + '...') : query) + '"',
+            priority: 1
+          });
+        } catch (e) {}
+      }
+    }
+    if (callbackDone) callbackDone();
+  });
+}
+
+function sampleActiveTabRelevance() {
+  chrome.storage.local.get(['isTaskActive'], function(s) {
+    if (!s.isTaskActive) return;
+    chrome.tabs.query({ active: true, lastFocusedWindow: true }, function(tabs) {
+      var tab = tabs && tabs[0];
+      if (!tab || !tab.url || tab.url.startsWith('chrome://')) return;
+      // Log search queries
+      logSearchIfAny(tab);
+      var q = parseSearchQuery(tab.url || '');
+      if (q) maybeNotifySearchDistraction(q);
+      // Classify relevance
+      checkRelevanceWithAI(tab.url, tab.title || '', tab, function(relevanceResult) {
+        var todayKey = new Date().toDateString();
+        chrome.storage.local.get([todayKey], function(res) {
+          var day = res[todayKey] || { relevantTime: 0, distractedTime: 0 };
+          // +1 minute bucketed
+          if (relevanceResult.isRelevant) day.relevantTime = (day.relevantTime || 0) + 1;
+          else day.distractedTime = (day.distractedTime || 0) + 1;
+          chrome.storage.local.set({ [todayKey]: day });
+        });
+      });
+    });
+  });
+}
+
+// Also sample on committed navigation while task active
+chrome.webNavigation.onCommitted.addListener(function(details) {
+  chrome.storage.local.get(['isTaskActive'], function(s) {
+    if (!s.isTaskActive) return;
+    if (details.transitionType === 'link' || details.transitionType === 'typed' || details.transitionType === 'reload') {
+      chrome.tabs.get(details.tabId, function(tab) {
+        if (tab && tab.url) {
+          logSearchIfAny(tab);
+          var q = parseSearchQuery(tab.url || '');
+          if (q) maybeNotifySearchDistraction(q);
+          sampleActiveTabRelevance();
+        }
+      });
+    }
+  });
+});
