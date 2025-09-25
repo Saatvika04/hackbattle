@@ -3,7 +3,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
   await loadSettings();
   setupEventListeners();
-  await loadBlacklist();
 });
 
 // Load all settings from storage
@@ -108,19 +107,6 @@ function setupEventListeners() {
     minSessionTime.addEventListener('change', saveSettings);
   }
 
-  // Blacklist management
-  document.getElementById('addRule').addEventListener('click', addBlacklistRule);
-  document.getElementById('newRule').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') addBlacklistRule();
-  });
-
-  // Preset buttons
-  document.querySelectorAll('.preset-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const site = e.target.dataset.site;
-      addToBlacklist(site);
-    });
-  });
 
   // Data management buttons
   document.getElementById('exportData').addEventListener('click', exportData);
@@ -239,102 +225,30 @@ async function saveEmailAddress() {
   }
 }
 
-// Load and display blacklist
-async function loadBlacklist() {
-  try {
-    const result = await chrome.storage.local.get(['blacklist']);
-    const blacklist = result.blacklist || [];
-    
-    const rulesList = document.getElementById('rulesList');
-    rulesList.innerHTML = '';
-
-    if (blacklist.length === 0) {
-      rulesList.innerHTML = '<p class="no-rules">No blacklisted websites yet. Add some to get started!</p>';
-      return;
-    }
-
-    blacklist.forEach((site, index) => {
-      const ruleItem = document.createElement('div');
-      ruleItem.className = 'rule-item';
-      ruleItem.innerHTML = `
-        <span class="rule-site">${site}</span>
-        <button class="remove-rule" data-index="${index}" title="Remove this rule">×</button>
-      `;
-      rulesList.appendChild(ruleItem);
-    });
-
-    // Add event listeners to remove buttons
-    document.querySelectorAll('.remove-rule').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const index = parseInt(e.target.dataset.index);
-        removeFromBlacklist(index);
-      });
-    });
-  } catch (error) {
-    console.error('Error loading blacklist:', error);
-  }
-}
-
-// Add blacklist rule
-async function addBlacklistRule() {
-  const newRule = document.getElementById('newRule').value.trim();
+// Save API key
+async function saveApiKey() {
+  const apiKey = document.getElementById('apiKey').value.trim();
   
-  if (!newRule) {
-    showMessage('Please enter a website to blacklist.', 'warning');
+  if (!apiKey) {
+    showMessage('Please enter your Gemini API key.', 'warning');
     return;
   }
 
-  await addToBlacklist(newRule);
-  document.getElementById('newRule').value = '';
-}
-
-// Add to blacklist (helper function)
-async function addToBlacklist(site) {
   try {
-    // Clean up the site URL
-    let cleanSite = site.toLowerCase().trim();
-    cleanSite = cleanSite.replace(/^https?:\/\//, '');
-    cleanSite = cleanSite.replace(/^www\./, '');
-    cleanSite = cleanSite.split('/')[0]; // Remove path
-
-    const result = await chrome.storage.local.get(['blacklist']);
-    const blacklist = result.blacklist || [];
-
-    if (blacklist.includes(cleanSite)) {
-      showMessage('This website is already blacklisted.', 'warning');
-      return;
-    }
-
-    blacklist.push(cleanSite);
-    await chrome.storage.local.set({ blacklist: blacklist });
-    
-    showMessage(`${cleanSite} added to blacklist!`, 'success');
-    await loadBlacklist();
+    await chrome.storage.local.set({ apiKey: apiKey });
+    showMessage('API key saved successfully!', 'success');
   } catch (error) {
-    console.error('Error adding to blacklist:', error);
-    showMessage('Error adding website to blacklist.', 'error');
+    console.error('Error saving API key:', error);
+    showMessage('Error saving API key. Please try again.', 'error');
   }
 }
 
-// Remove from blacklist
-async function removeFromBlacklist(index) {
-  try {
-    const result = await chrome.storage.local.get(['blacklist']);
-    const blacklist = result.blacklist || [];
 
-    if (index >= 0 && index < blacklist.length) {
-      const removedSite = blacklist[index];
-      blacklist.splice(index, 1);
-      await chrome.storage.local.set({ blacklist: blacklist });
-      
-      showMessage(`${removedSite} removed from blacklist!`, 'success');
-      await loadBlacklist();
-    }
-  } catch (error) {
-    console.error('Error removing from blacklist:', error);
-    showMessage('Error removing website from blacklist.', 'error');
-  }
-}
+
+
+
+
+
 
 // Export data
 async function exportData() {
@@ -401,7 +315,6 @@ async function resetSettings() {
     // Reload settings
     setTimeout(() => {
       loadSettings();
-      loadBlacklist();
     }, 1000);
   } catch (error) {
     console.error('Error resetting settings:', error);
