@@ -48,3 +48,28 @@ safeSendMessage({
   title: document.title,
   timestamp: Date.now()
 });
+
+// Listen for messages from the website to sync task/blacklist into extension storage
+window.addEventListener('message', function(event) {
+  // Only accept messages from the same page context
+  if (event.source !== window || !event.data || typeof event.data.type !== 'string') {
+    return;
+  }
+
+  try {
+    if (event.data.type === 'LOCKEDIN_START_TASK') {
+      var p = event.data.payload || {};
+      chrome.storage.local.set({
+        currentTask: p.currentTask,
+        taskDuration: p.taskDuration,
+        taskStartTime: p.taskStartTime,
+        isTaskActive: !!p.isTaskActive
+      });
+    } else if (event.data.type === 'LOCKEDIN_SYNC_BLACKLIST') {
+      var bl = (event.data.payload && event.data.payload.blacklist) || [];
+      chrome.storage.local.set({ lockedInBlacklist: bl });
+    }
+  } catch (e) {
+    // Ignore if chrome APIs are unavailable on this page
+  }
+});

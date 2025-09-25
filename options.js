@@ -55,6 +55,13 @@ async function loadSettings() {
 
 // Setup all event listeners
 function setupEventListeners() {
+  // Back to app button (avoid inline JS per CSP)
+  const backBtn = document.getElementById('backToAppBtn');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      chrome.tabs.create({ url: 'http://localhost:5173' });
+    });
+  }
   // Weekly reports toggle
   document.getElementById('weeklyReports').addEventListener('change', (e) => {
     saveSettings();

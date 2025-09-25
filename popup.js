@@ -29,22 +29,29 @@ async function updateTimer() {
     const totalDurationEl = document.getElementById('totalDuration');
     const timeLeftEl = document.getElementById('timeLeft');
     const progressFillEl = document.getElementById('progressFill');
+    const endTaskBtn = document.getElementById('endTaskBtn');
 
     if (result.isTaskActive && result.taskStartTime && result.taskDuration) {
       const now = Date.now();
-      const elapsed = Math.floor((now - result.taskStartTime) / 1000 / 60); // minutes
-      const remaining = Math.max(0, result.taskDuration - elapsed);
-      const progress = Math.min(100, (elapsed / result.taskDuration) * 100);
+      const totalSeconds = Math.max(1, result.taskDuration * 60);
+      const elapsedSeconds = Math.floor((now - result.taskStartTime) / 1000);
+      const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds);
+      const progress = Math.min(100, (elapsedSeconds / totalSeconds) * 100);
 
       // Update UI
       currentTaskEl.textContent = result.currentTask || 'Active Task';
       totalDurationEl.textContent = `${result.taskDuration}min`;
       
-      if (remaining > 0) {
-        const hours = Math.floor(remaining / 60);
-        const minutes = remaining % 60;
-        timeLeftEl.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      if (remainingSeconds > 0) {
+        const hours = Math.floor(remainingSeconds / 3600);
+        const minutes = Math.floor((remainingSeconds % 3600) / 60);
+        const seconds = remainingSeconds % 60;
+        const hh = hours.toString().padStart(2, '0');
+        const mm = minutes.toString().padStart(2, '0');
+        const ss = seconds.toString().padStart(2, '0');
+        timeLeftEl.textContent = hours > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
         progressFillEl.style.width = `${progress}%`;
+        if (endTaskBtn) endTaskBtn.disabled = false;
       } else {
         timeLeftEl.textContent = '00:00';
         progressFillEl.style.width = '100%';
@@ -54,12 +61,14 @@ async function updateTimer() {
           await chrome.storage.local.set({ isTaskActive: false });
           showTaskCompleteNotification();
         }
+        if (endTaskBtn) endTaskBtn.disabled = true;
       }
     } else {
       currentTaskEl.textContent = 'No active task';
       totalDurationEl.textContent = '--';
       timeLeftEl.textContent = '--:--';
       progressFillEl.style.width = '0%';
+      if (endTaskBtn) endTaskBtn.disabled = true;
     }
   } catch (error) {
     console.error('Error updating timer:', error);
@@ -222,6 +231,18 @@ function setupEventListeners() {
     chrome.tabs.create({ url: 'http://localhost:5173' });
   });
 
+  // End task button
+  document.getElementById('endTaskBtn').addEventListener('click', async () => {
+    try {
+      await chrome.storage.local.set({ isTaskActive: false });
+      // Optionally clear timer specifics
+      // await chrome.storage.local.remove(['currentTask','taskDuration','taskStartTime']);
+      await updateTimer();
+    } catch (e) {
+      console.error('Error ending task:', e);
+    }
+  });
+
   // Close daily report modal
   document.getElementById('closeDailyReport').addEventListener('click', hideDailyReport);
 
@@ -229,6 +250,13 @@ function setupEventListeners() {
   document.getElementById('dailyReportModal').addEventListener('click', (e) => {
     if (e.target.id === 'dailyReportModal') {
       hideDailyReport();
+    }
+  });
+
+  // Live update popup when storage changes (e.g., task started from website)
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && (changes.isTaskActive || changes.taskStartTime || changes.taskDuration)) {
+      updateTimer();
     }
   });
 }

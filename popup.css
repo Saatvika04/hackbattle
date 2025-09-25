@@ -296,6 +296,18 @@ body {
   transform: translateY(-1px);
 }
 
+.action-btn.danger {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.action-btn:disabled,
+.action-btn[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: grayscale(10%);
+}
+
 /* Modal Styles */
 .modal {
   position: fixed;

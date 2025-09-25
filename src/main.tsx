@@ -63,13 +63,12 @@ function App() {
     }
   }, []);
 
-  // Save blacklist to localStorage and chrome.storage.local whenever it changes
+  // Save blacklist to localStorage and notify extension to sync to chrome.storage.local
   useEffect(() => {
     try {
       localStorage.setItem('lockedInBlacklist', JSON.stringify(blacklist));
-      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-        chrome.storage.local.set({ lockedInBlacklist: blacklist });
-      }
+      // Broadcast so content script can mirror into extension storage
+      try { window.postMessage({ type: 'LOCKEDIN_SYNC_BLACKLIST', payload: { blacklist } }, '*'); } catch (e) {}
     } catch (_) {
       // ignore storage errors
     }
@@ -78,15 +77,18 @@ function App() {
   const handleStart = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Save task and duration to chrome storage (for extension)
-    if (typeof chrome !== 'undefined' && chrome.storage) {
-      chrome.storage.local.set({
-        currentTask: task,
-        taskDuration: parseInt(duration),
-        taskStartTime: Date.now(),
-        isTaskActive: true
-      });
-    }
+    // Post to page so content script can persist to chrome.storage
+    try {
+      window.postMessage({
+        type: 'LOCKEDIN_START_TASK',
+        payload: {
+          currentTask: task,
+          taskDuration: parseInt(duration),
+          taskStartTime: Date.now(),
+          isTaskActive: true
+        }
+      }, '*');
+    } catch (e) {}
     
     alert(`LockedIn! 🎯
 Task: ${task}

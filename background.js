@@ -376,12 +376,16 @@ function buildBlockRules(domains) {
     var host = toHostnamePattern(domains[i]);
     if (!host) continue;
     var id = domainRuleId(host);
+    // Build a regex to match http(s) main-frame navigations to host or any subdomain
+    var escaped = host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var regex = '^https?:\/\/([a-z0-9-]+\\.)?' + escaped + '\/';
     rules.push({
       id: id,
       priority: 1,
       action: { type: 'block' },
       condition: {
-        urlFilter: '||' + host,
+        regexFilter: regex,
+        isUrlFilterCaseSensitive: false,
         resourceTypes: ['main_frame']
       }
     });
@@ -420,10 +424,21 @@ function applyBlockingFromState() {
 
 chrome.storage.onChanged.addListener(function(changes, area) {
   if (area !== 'local') return;
-  chrome.storage.local.get(['isTaskActive', 'lockedInBlacklist'], function(res) {
+  chrome.storage.local.get(['isTaskActive', 'lockedInBlacklist', 'taskStartTime', 'taskDuration'], function(res) {
     var active = !!res.isTaskActive;
     var bl = res.lockedInBlacklist || [];
     updateBlocking(active, bl);
+
+    // Manage task end alarm
+    if (active && res.taskStartTime && res.taskDuration) {
+      var endWhen = res.taskStartTime + res.taskDuration * 60 * 1000;
+      var delayMs = Math.max(0, endWhen - Date.now());
+      // Create/replace a one-off alarm for task end
+      chrome.alarms.create('taskEnd', { when: Date.now() + delayMs });
+    } else {
+      // Clear task end alarm when task is not active
+      chrome.alarms.clear('taskEnd');
+    }
   });
 });
 
@@ -431,3 +446,34 @@ chrome.runtime.onInstalled.addListener(applyBlockingFromState);
 if (chrome.runtime.onStartup) {
   chrome.runtime.onStartup.addListener(applyBlockingFromState);
 }
+
+// Ensure timing persists even if popup is closed
+chrome.alarms.onAlarm.addListener(function(alarm) {
+  if (alarm && alarm.name === 'taskEnd') {
+    chrome.storage.local.get(['isTaskActive'], function(res) {
+      if (res.isTaskActive) {
+        chrome.storage.local.set({ isTaskActive: false });
+      }
+    });
+  } else if (alarm && alarm.name === 'clearRelevanceCache') {
+    clearRelevanceCache();
+  }
+});
+
+// On startup, re-schedule task end if needed
+function rescheduleTaskEndIfNeeded() {
+  chrome.storage.local.get(['isTaskActive', 'taskStartTime', 'taskDuration'], function(res) {
+    if (res.isTaskActive && res.taskStartTime && res.taskDuration) {
+      var endWhen = res.taskStartTime + res.taskDuration * 60 * 1000;
+      if (Date.now() >= endWhen) {
+        chrome.storage.local.set({ isTaskActive: false });
+      } else {
+        chrome.alarms.create('taskEnd', { when: endWhen });
+      }
+    } else {
+      chrome.alarms.clear('taskEnd');
+    }
+  });
+}
+
+rescheduleTaskEndIfNeeded();
