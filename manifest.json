@@ -1,17 +1,20 @@
 {
     "manifest_version": 3,
-    "name": "FocusTracker - Productivity & Time Management",
+    "name": "LockedIn - Focus Timer & Productivity Tracker",
     "version": "1.0.0",
-    "description": "Track your focus score, visualize time allocation, and get weekly productivity reports.",
+    "description": "Stay focused with timer tracking, website blacklisting, and AI-powered insights. Block distractions and boost productivity.",
     "permissions": [
       "activeTab",
       "storage",
       "alarms",
       "tabs",
-      "notifications"
+      "notifications",
+      "idle",
+      "scripting"
     ],
     "host_permissions": [
-      "<all_urls>"
+      "<all_urls>",
+      "https://generativelanguage.googleapis.com/*"
     ],
     "background": {
       "service_worker": "background.js"
@@ -24,7 +27,12 @@
     ],
     "action": {
       "default_popup": "popup.html",
-      "default_title": "FocusTracker"
+      "default_title": "LockedIn",
+      "default_icon": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+      }
     },
     "options_page": "options.html",
     "content_security_policy": {

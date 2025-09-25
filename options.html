@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FocusTracker Settings</title>
+  <title>LockedIn Settings</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
@@ -11,22 +11,26 @@
     <header class="header">
       <div class="logo">
         <div class="logo-icon">🎯</div>
-        <h1>FocusTracker Settings</h1>
+        <h1>LockedIn Settings</h1>
       </div>
+      <button onclick="window.open('http://localhost:5173', '_blank')" class="back-btn">
+        🌐 Back to App
+      </button>
     </header>
 
     <div class="content">
+      <!-- Email Reports Section -->
       <section class="settings-section">
-        <h2>📊 Reports & Notifications</h2>
+        <h2>� Email Reports</h2>
         
         <div class="setting-item">
           <div class="setting-info">
             <h3>Weekly Email Reports</h3>
-            <p>Receive a summary of your focus score and time allocation every Sunday</p>
+            <p>Receive a comprehensive focus report every Sunday with AI insights and recommendations</p>
           </div>
           <div class="setting-control">
             <label class="toggle">
-              <input type="checkbox" id="weeklyReports" checked>
+              <input type="checkbox" id="weeklyReports">
               <span class="slider"></span>
             </label>
           </div>
@@ -39,15 +43,155 @@
           </div>
           <div class="setting-control">
             <input type="email" id="emailAddress" placeholder="your@email.com" class="email-input">
+            <button id="saveEmail" class="save-btn">Save</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Custom Rules Section -->
+      <section class="settings-section">
+        <h2>🚫 Custom Blacklist Rules</h2>
+        <p class="section-description">Block websites that are always distracting, regardless of your current task</p>
+        
+        <div class="blacklist-manager">
+          <div class="add-rule">
+            <input type="text" id="newRule" placeholder="e.g., facebook.com, twitter.com" class="rule-input">
+            <button id="addRule" class="add-btn">Add Rule</button>
+          </div>
+          
+          <div class="rules-list" id="rulesList">
+            <!-- Rules will be populated here -->
+          </div>
+          
+          <div class="preset-rules">
+            <h4>Quick Add Common Distractions:</h4>
+            <div class="preset-buttons">
+              <button class="preset-btn" data-site="facebook.com">Facebook</button>
+              <button class="preset-btn" data-site="twitter.com">Twitter</button>
+              <button class="preset-btn" data-site="instagram.com">Instagram</button>
+              <button class="preset-btn" data-site="tiktok.com">TikTok</button>
+              <button class="preset-btn" data-site="youtube.com">YouTube</button>
+              <button class="preset-btn" data-site="reddit.com">Reddit</button>
+              <button class="preset-btn" data-site="netflix.com">Netflix</button>
+              <button class="preset-btn" data-site="twitch.tv">Twitch</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- AI & Tracking Section -->
+      <section class="settings-section">
+        <h2>🤖 AI & Tracking</h2>
+        
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Gemini AI API Key</h3>
+            <p>Required for AI-powered focus scoring and insights</p>
+          </div>
+          <div class="setting-control">
+            <input type="password" id="apiKey" placeholder="Enter your Gemini API key" class="api-input">
+            <button id="saveApiKey" class="save-btn">Save</button>
           </div>
         </div>
 
         <div class="setting-item">
           <div class="setting-info">
-            <h3>Daily Focus Goal</h3>
-            <p>Set your target focus score for each day</p>
+            <h3>Focus Tracking</h3>
+            <p>Enable automatic tracking of website relevance and focus patterns</p>
           </div>
           <div class="setting-control">
+            <label class="toggle">
+              <input type="checkbox" id="focusTracking" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Behavioral Analysis</h3>
+            <p>Track tab switches, breaks, and engagement patterns for better insights</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle">
+              <input type="checkbox" id="behaviorTracking" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Notifications Section -->
+      <section class="settings-section">
+        <h2>🔔 Notifications</h2>
+        
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Break Reminders</h3>
+            <p>Get notified when it's time to take a break during focus sessions</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle">
+              <input type="checkbox" id="breakReminders" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Distraction Alerts</h3>
+            <p>Get warned when visiting blacklisted sites during focus sessions</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle">
+              <input type="checkbox" id="distractionAlerts" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Session Complete</h3>
+            <p>Celebrate when you complete a focus session successfully</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle">
+              <input type="checkbox" id="sessionComplete" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Data Management Section -->
+      <section class="settings-section">
+        <h2>💾 Data Management</h2>
+        
+        <div class="data-actions">
+          <button id="exportData" class="action-btn export">
+            📊 Export All Data
+          </button>
+          <button id="clearData" class="action-btn danger">
+            🗑️ Clear All Data
+          </button>
+          <button id="resetSettings" class="action-btn warning">
+            ↩️ Reset Settings
+          </button>
+        </div>
+      </section>
+
+      <!-- Success/Error Messages -->
+      <div id="messageContainer" class="message-container hidden">
+        <div id="messageText"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
             <div class="range-input">
               <input type="range" id="focusGoal" min="50" max="100" value="80">
               <span id="focusGoalValue">80%</span>
@@ -119,6 +263,48 @@
               <option value="30">30 seconds</option>
               <option value="60">1 minute</option>
             </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>🤖 AI Settings</h2>
+        
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>AI-Powered Relevance Checking</h3>
+            <p>Use Google Gemini AI to intelligently determine if websites are relevant to your current session</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle">
+              <input type="checkbox" id="enableAI" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-item" id="geminiApiSettings">
+          <div class="setting-info">
+            <h3>Gemini API Key</h3>
+            <p>Enter your Google Gemini API key for AI-powered relevance checking. <a href="https://makersuite.google.com/app/apikey" target="_blank">Get your API key here</a></p>
+          </div>
+          <div class="setting-control">
+            <input type="password" id="geminiApiKey" placeholder="Enter your Gemini API key" class="api-key-input">
+            <button id="testApiBtn" class="test-btn">Test Connection</button>
+          </div>
+          <div id="apiStatus" class="api-status"></div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>AI Fallback Mode</h3>
+            <p>Use keyword matching when AI is unavailable or API key is not provided</p>
+          </div>
+          <div class="setting-control">
+            <label class="toggle">
+              <input type="checkbox" id="enableFallback" checked>
+              <span class="slider"></span>
+            </label>
           </div>
         </div>
       </section>
