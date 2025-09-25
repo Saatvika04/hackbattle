@@ -12,7 +12,12 @@ async function loadSettings() {
     const result = await chrome.storage.local.get([
       'weeklyReports',
       'emailAddress',
-      'apiKey',
+      'geminiApiKey',
+      'enableAI',
+      'personalizedPrompt',
+      'enableFallback',
+      'trackInactive',
+      'minSessionTime',
       'focusTracking',
       'behaviorTracking',
       'breakReminders',
@@ -23,15 +28,27 @@ async function loadSettings() {
     // Update UI with saved settings
     document.getElementById('weeklyReports').checked = result.weeklyReports || false;
     document.getElementById('emailAddress').value = result.emailAddress || '';
-    document.getElementById('apiKey').value = result.apiKey || '';
+    document.getElementById('geminiApiKey').value = result.geminiApiKey || '';
+    document.getElementById('enableAI').checked = result.enableAI !== false; // Default true
+    document.getElementById('personalizedPrompt').value = result.personalizedPrompt || '';
+    document.getElementById('enableFallback').checked = result.enableFallback !== false; // Default true
+    document.getElementById('trackInactive').checked = result.trackInactive || false;
+    
+    // Set minimum session time dropdown
+    const minSessionSelect = document.getElementById('minSessionTime');
+    if (minSessionSelect) {
+      minSessionSelect.value = result.minSessionTime || '5';
+    }
+    
     document.getElementById('focusTracking').checked = result.focusTracking !== false; // Default true
     document.getElementById('behaviorTracking').checked = result.behaviorTracking !== false; // Default true
     document.getElementById('breakReminders').checked = result.breakReminders !== false; // Default true
     document.getElementById('distractionAlerts').checked = result.distractionAlerts !== false; // Default true
     document.getElementById('sessionComplete').checked = result.sessionComplete !== false; // Default true
 
-    // Show/hide email settings based on weekly reports toggle
+    // Show/hide settings based on toggles
     toggleEmailSettings();
+    toggleAISettings();
   } catch (error) {
     console.error('Error loading settings:', error);
   }
@@ -51,17 +68,45 @@ function setupEventListeners() {
     if (e.key === 'Enter') saveEmailAddress();
   });
 
-  // API key save
-  document.getElementById('saveApiKey').addEventListener('click', saveApiKey);
-  document.getElementById('apiKey').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') saveApiKey();
-  });
+  // AI Settings
+  const enableAIToggle = document.getElementById('enableAI');
+  if (enableAIToggle) {
+    enableAIToggle.addEventListener('change', (e) => {
+      saveSettings();
+      toggleAISettings();
+    });
+  }
+
+  // Gemini API key and test
+  const testApiBtn = document.getElementById('testApiBtn');
+  if (testApiBtn) {
+    testApiBtn.addEventListener('click', testGeminiAPI);
+  }
+
+  const geminiApiKey = document.getElementById('geminiApiKey');
+  if (geminiApiKey) {
+    geminiApiKey.addEventListener('input', saveSettings);
+  }
+
+  const personalizedPrompt = document.getElementById('personalizedPrompt');
+  if (personalizedPrompt) {
+    personalizedPrompt.addEventListener('input', saveSettings);
+  }
 
   // All other toggles
-  const toggles = ['focusTracking', 'behaviorTracking', 'breakReminders', 'distractionAlerts', 'sessionComplete'];
+  const toggles = ['enableFallback', 'trackInactive', 'focusTracking', 'behaviorTracking', 'breakReminders', 'distractionAlerts', 'sessionComplete'];
   toggles.forEach(toggleId => {
-    document.getElementById(toggleId).addEventListener('change', saveSettings);
+    const element = document.getElementById(toggleId);
+    if (element) {
+      element.addEventListener('change', saveSettings);
+    }
   });
+
+  // Minimum session time dropdown
+  const minSessionTime = document.getElementById('minSessionTime');
+  if (minSessionTime) {
+    minSessionTime.addEventListener('change', saveSettings);
+  }
 
   // Blacklist management
   document.getElementById('addRule').addEventListener('click', addBlacklistRule);
@@ -95,11 +140,67 @@ function toggleEmailSettings() {
   }
 }
 
+// Toggle AI settings visibility
+function toggleAISettings() {
+  const geminiApiSettings = document.getElementById('geminiApiSettings');
+  const enableAI = document.getElementById('enableAI').checked;
+  
+  if (geminiApiSettings) {
+    if (enableAI) {
+      geminiApiSettings.style.display = 'flex';
+    } else {
+      geminiApiSettings.style.display = 'none';
+    }
+  }
+}
+
+// Test Gemini API connection
+async function testGeminiAPI() {
+  const apiKey = document.getElementById('geminiApiKey').value;
+  const statusDiv = document.getElementById('apiStatus');
+  const testBtn = document.getElementById('testApiBtn');
+  
+  if (!apiKey) {
+    statusDiv.innerHTML = '<span style="color: #e53e3e;">Please enter an API key first</span>';
+    return;
+  }
+  
+  testBtn.textContent = 'Testing...';
+  testBtn.disabled = true;
+  
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: 'Test connection' }] }]
+      })
+    });
+    
+    if (response.ok) {
+      statusDiv.innerHTML = '<span style="color: #38a169;">✓ API connection successful!</span>';
+    } else {
+      statusDiv.innerHTML = '<span style="color: #e53e3e;">✗ API connection failed. Check your key.</span>';
+    }
+  } catch (error) {
+    statusDiv.innerHTML = '<span style="color: #e53e3e;">✗ Connection error. Check your internet.</span>';
+  }
+  
+  testBtn.textContent = 'Test Connection';
+  testBtn.disabled = false;
+}
+
 // Save general settings
 async function saveSettings() {
   try {
     const settings = {
       weeklyReports: document.getElementById('weeklyReports').checked,
+      enableAI: document.getElementById('enableAI')?.checked !== false,
+      geminiApiKey: document.getElementById('geminiApiKey')?.value || '',
+      personalizedPrompt: document.getElementById('personalizedPrompt')?.value || '',
+      enableFallback: document.getElementById('enableFallback')?.checked !== false,
+      trackInactive: document.getElementById('trackInactive')?.checked || false,
+      minSessionTime: document.getElementById('minSessionTime')?.value || '5',
       focusTracking: document.getElementById('focusTracking').checked,
       behaviorTracking: document.getElementById('behaviorTracking').checked,
       breakReminders: document.getElementById('breakReminders').checked,
@@ -135,24 +236,6 @@ async function saveEmailAddress() {
   } catch (error) {
     console.error('Error saving email:', error);
     showMessage('Error saving email address. Please try again.', 'error');
-  }
-}
-
-// Save API key
-async function saveApiKey() {
-  const apiKey = document.getElementById('apiKey').value.trim();
-  
-  if (!apiKey) {
-    showMessage('Please enter your Gemini API key.', 'warning');
-    return;
-  }
-
-  try {
-    await chrome.storage.local.set({ apiKey: apiKey });
-    showMessage('API key saved successfully!', 'success');
-  } catch (error) {
-    console.error('Error saving API key:', error);
-    showMessage('Error saving API key. Please try again.', 'error');
   }
 }
 

@@ -427,7 +427,7 @@ async function calculateEnhancedFocusScore(basicData) {
 
 // LLM analyzes ALL parameters to generate intelligent focus score
 async function getLLMFocusAnalysis(trackingData) {
-  var result = await chrome.storage.sync.get(['geminiApiKey']);
+  var result = await chrome.storage.local.get(['geminiApiKey']);
   var apiKey = result.geminiApiKey;
   
   if (!apiKey) {
@@ -933,9 +933,10 @@ function checkRelevanceWithAI(url, title, activeTabInfo, callback) {
     return;
   }
   
-  // Get user's API key and current session category
-  chrome.storage.sync.get(['geminiApiKey', 'currentSessionCategory'], function(result) {
+  // Get user's API key, current session category, and personalized prompt
+  chrome.storage.local.get(['geminiApiKey', 'personalizedPrompt', 'currentSessionCategory'], function(result) {
     var apiKey = result.geminiApiKey;
+    var personalizedPrompt = result.personalizedPrompt || '';
     var sessionCategory = result.currentSessionCategory || 'work';
     
     if (!apiKey) {
@@ -967,14 +968,22 @@ function checkRelevanceWithAI(url, title, activeTabInfo, callback) {
       domain = url.split('/')[2] || '';
     }
     
-    // Prepare enhanced AI prompt with rich context
-    var prompt = 'Analyze webpage relevance for productivity tracking.\n\n' +
+    // Prepare enhanced AI prompt with rich context and personalized preferences
+    var basePrompt = 'Analyze webpage relevance for productivity tracking.\n\n' +
                 'CONTEXT:\n' +
                 '- Session Goal: "' + sessionCategory + '" (user\'s declared focus)\n' +
                 '- Time: ' + timeContext + '\n' +
                 '- Domain: ' + domain + '\n' +
                 '- URL: ' + url + '\n' +
-                '- Page Title: "' + title + '"\n\n' +
+                '- Page Title: "' + title + '"\n\n';
+                
+    // Add personalized context if provided
+    if (personalizedPrompt.trim()) {
+      basePrompt += 'USER PERSONALIZED CONTEXT:\n' +
+                   personalizedPrompt + '\n\n';
+    }
+    
+    var prompt = basePrompt +
                 'RELEVANCE SCORING (0-100):\n' +
                 '90-100: Directly supports session goal, high productivity value\n' +
                 '70-89: Somewhat relevant, moderate productivity value\n' +
@@ -986,7 +995,8 @@ function checkRelevanceWithAI(url, title, activeTabInfo, callback) {
                 '- Time appropriateness (work sites during work hours = higher score)\n' +
                 '- Domain patterns (github.com for work, coursera.org for study)\n' +
                 '- Title keywords indicating content type\n' +
-                '- Potential for deep work vs. mindless browsing\n\n' +
+                '- Potential for deep work vs. mindless browsing\n' +
+                '- User\'s personalized context and preferences\n\n' +
                 'EXAMPLES:\n' +
                 '- Work session + github.com + "Project Repository" = 95\n' +
                 '- Work session + linkedin.com + "Professional Network" = 80\n' +
