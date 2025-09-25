@@ -193,6 +193,24 @@ input:checked + .slider:before {
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
+.prompt-textarea {
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.prompt-textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
 /* Buttons */
 .save-btn, .add-btn {
   background: linear-gradient(135deg, #667eea, #764ba2);
