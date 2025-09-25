@@ -3,21 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FocusTracker</title>
+  <title>LockedIn Extension</title>
   <link rel="stylesheet" href="popup.css">
-  <!-- DELETED the incorrect chart.js script from here -->
 </head>
 <body>
   <div class="container">
     <header class="header">
       <div class="logo">
         <div class="logo-icon">🎯</div>
-        <h1>FocusTracker</h1>
+        <h1>LockedIn</h1>
       </div>
       <button id="settingsBtn" class="settings-btn">⚙️</button>
     </header>
 
-    <div class="focus-score-section">
+    <!-- Timer Section -->
+    <div class="timer-section">
+      <div class="timer-card">
+        <div class="timer-display">
+          <div class="time-left" id="timeLeft">--:--</div>
+          <div class="timer-label">Time Remaining</div>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="timer-info">
+          <span id="currentTask">No active task</span>
+          <span id="totalDuration">--</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Focus Score Section -->
+    <div class="focus-section">
       <div class="focus-score-card">
         <div class="score-circle">
           <div class="score-text">
@@ -25,66 +42,83 @@
             <small>%</small>
           </div>
         </div>
-        <h2>Today's Focus Score</h2>
-        <p id="focusMessage">Calculating your focus...</p>
+        <h3>Today's Focus</h3>
       </div>
     </div>
 
+    <!-- Quick Stats -->
     <div class="stats-section">
       <div class="stat-card">
-        <div class="stat-icon">⏱️</div>
+        <div class="stat-icon">✅</div>
         <div class="stat-content">
-          <span class="stat-value" id="totalTime">0h 0m</span>
-          <span class="stat-label">Total Time</span>
+          <span class="stat-value" id="relevantTime">0m</span>
+          <span class="stat-label">On Task</span>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">🎯</div>
+        <div class="stat-icon">❌</div>
         <div class="stat-content">
-          <span class="stat-value" id="productiveTime">0h 0m</span>
-          <span class="stat-label">Productive</span>
+          <span class="stat-value" id="distractedTime">0m</span>
+          <span class="stat-label">Distracted</span>
         </div>
       </div>
     </div>
 
+    <!-- Daily Chart Section -->
     <div class="chart-section">
-      <h3>Time Allocation Today</h3>
+      <h3>Today's Activity</h3>
       <div class="chart-container">
-        <canvas id="timeChart"></canvas>
+        <canvas id="dailyChart"></canvas>
       </div>
       <div id="noDataMessage" class="no-data hidden">
-        <p>Start browsing to see your time allocation!</p>
+        <p>Start a task to see your activity!</p>
       </div>
     </div>
 
-    <div class="weekly-section">
-      <h3>Weekly Overview</h3>
-      <div class="week-stats">
-        <div class="week-stat">
-          <span class="week-value" id="weekFocusScore">--</span>
-          <span class="week-label">Avg Focus</span>
-        </div>
-        <div class="week-stat">
-          <span class="week-value" id="weekTotalTime">0h</span>
-          <span class="week-label">Total Time</span>
-        </div>
-      </div>
-      <div class="weekly-chart-container">
-        <canvas id="weeklyChart"></canvas>
-      </div>
-    </div>
-
+    <!-- Actions -->
     <div class="actions">
-      <button id="viewReportBtn" class="action-btn primary">
-        📊 View Weekly Report
+      <button id="dailyReportBtn" class="action-btn primary">
+        📊 Daily Report
       </button>
-      <button id="exportDataBtn" class="action-btn secondary">
-        💾 Export Data
+      <button id="openWebsiteBtn" class="action-btn secondary">
+        🌐 Open LockedIn
       </button>
+    </div>
+
+    <!-- Daily Report Modal -->
+    <div id="dailyReportModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>📊 Daily Report</h3>
+          <button class="close-btn" id="closeDailyReport">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="report-chart-container">
+            <canvas id="dailyReportChart"></canvas>
+          </div>
+          <div class="report-stats">
+            <div class="report-stat">
+              <span class="report-label">Total Sessions:</span>
+              <span class="report-value" id="totalSessions">0</span>
+            </div>
+            <div class="report-stat">
+              <span class="report-label">Focus Score:</span>
+              <span class="report-value" id="dailyFocusScore">--%</span>
+            </div>
+            <div class="report-stat">
+              <span class="report-label">Time On Task:</span>
+              <span class="report-value" id="timeOnTask">0m</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- ADDED type="module" to load the script correctly -->
+  <!-- Load Chart.js from CDN first -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Load popup script -->
   <script type="module" src="popup.js"></script>
 </body>
 </html>

@@ -1,551 +1,369 @@
-// Popup script for FocusTracker
-let timeChart = null;
-let weeklyChart = null;
+// LockedIn Extension Popup Script
+let dailyChart = null;
+let dailyReportChart = null;
+let timerInterval = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await loadDashboardData();
+  await loadExtensionData();
   setupEventListeners();
+  startTimerUpdates();
 });
 
-async function loadDashboardData() {
+async function loadExtensionData() {
+  try {
+    await updateTimer();
+    await updateFocusScore();
+    await updateDailyStats();
+    await createDailyChart();
+  } catch (error) {
+    console.error('Error loading extension data:', error);
+  }
+}
+
+// Timer functionality
+async function updateTimer() {
+  try {
+    const result = await chrome.storage.local.get(['currentTask', 'taskDuration', 'taskStartTime', 'isTaskActive']);
+    
+    const currentTaskEl = document.getElementById('currentTask');
+    const totalDurationEl = document.getElementById('totalDuration');
+    const timeLeftEl = document.getElementById('timeLeft');
+    const progressFillEl = document.getElementById('progressFill');
+
+    if (result.isTaskActive && result.taskStartTime && result.taskDuration) {
+      const now = Date.now();
+      const elapsed = Math.floor((now - result.taskStartTime) / 1000 / 60); // minutes
+      const remaining = Math.max(0, result.taskDuration - elapsed);
+      const progress = Math.min(100, (elapsed / result.taskDuration) * 100);
+
+      // Update UI
+      currentTaskEl.textContent = result.currentTask || 'Active Task';
+      totalDurationEl.textContent = `${result.taskDuration}min`;
+      
+      if (remaining > 0) {
+        const hours = Math.floor(remaining / 60);
+        const minutes = remaining % 60;
+        timeLeftEl.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        progressFillEl.style.width = `${progress}%`;
+      } else {
+        timeLeftEl.textContent = '00:00';
+        progressFillEl.style.width = '100%';
+        
+        // Task completed
+        if (result.isTaskActive) {
+          await chrome.storage.local.set({ isTaskActive: false });
+          showTaskCompleteNotification();
+        }
+      }
+    } else {
+      currentTaskEl.textContent = 'No active task';
+      totalDurationEl.textContent = '--';
+      timeLeftEl.textContent = '--:--';
+      progressFillEl.style.width = '0%';
+    }
+  } catch (error) {
+    console.error('Error updating timer:', error);
+  }
+}
+
+function startTimerUpdates() {
+  // Update timer every second
+  timerInterval = setInterval(updateTimer, 1000);
+}
+
+function showTaskCompleteNotification() {
+  // Show celebration message
+  const messageEl = document.createElement('div');
+  messageEl.className = 'completion-message';
+  messageEl.innerHTML = '🎉 Task Complete! Great job staying focused!';
+  messageEl.style.cssText = `
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: bold;
+    z-index: 1000;
+    animation: slideIn 0.3s ease-out;
+  `;
+  
+  document.body.appendChild(messageEl);
+  setTimeout(() => messageEl.remove(), 3000);
+}
+
+async function updateFocusScore() {
+  const scoreElement = document.getElementById('focusScore');
+  
   try {
     const today = new Date().toDateString();
     const result = await chrome.storage.local.get([today]);
-    const todayData = result[today] || {
-      focusScore: 100,
-      totalTime: 0,
-      timeByCategory: {}
+    const todayData = result[today] || { focusScore: null };
+    
+    if (todayData.focusScore !== null && todayData.focusScore !== undefined) {
+      scoreElement.textContent = todayData.focusScore;
+      
+      // Update score circle
+      const scoreCircle = document.querySelector('.score-circle');
+      if (scoreCircle) {
+        const angle = (todayData.focusScore / 100) * 360;
+        scoreCircle.style.setProperty('--score-angle', `${angle}deg`);
+      }
+    } else {
+      scoreElement.textContent = '--';
+    }
+  } catch (error) {
+    console.error('Error updating focus score:', error);
+    scoreElement.textContent = '--';
+  }
+}
+
+async function updateDailyStats() {
+  try {
+    const today = new Date().toDateString();
+    const result = await chrome.storage.local.get([today]);
+    const todayData = result[today] || { 
+      relevantTime: 0, 
+      distractedTime: 0 
     };
 
-    updateFocusScore(todayData.focusScore);
-    updateTimeStats(todayData);
-    createTimeChart(todayData.timeByCategory);
-    
-    await loadWeeklyData();
+    const relevantTimeEl = document.getElementById('relevantTime');
+    const distractedTimeEl = document.getElementById('distractedTime');
+
+    relevantTimeEl.textContent = `${Math.round(todayData.relevantTime || 0)}m`;
+    distractedTimeEl.textContent = `${Math.round(todayData.distractedTime || 0)}m`;
   } catch (error) {
-    console.error('Error loading dashboard data:', error);
+    console.error('Error updating daily stats:', error);
   }
 }
 
-function updateFocusScore(score) {
-  const scoreElement = document.getElementById('focusScore');
-  const messageElement = document.getElementById('focusMessage');
-  const scoreCircle = document.querySelector('.score-circle');
+async function createDailyChart() {
+  const canvas = document.getElementById('dailyChart');
+  const ctx = canvas.getContext('2d');
   
-  if (!scoreElement || !messageElement || !scoreCircle) {
-    console.error('Missing required DOM elements for focus score display');
-    return;
-  }
-  
-  scoreElement.textContent = score;
-  
-  // Update progress circle
-  const angle = (score / 100) * 360;
-  scoreCircle.style.setProperty('--score-angle', `${angle}deg`);
-  
-  // Update message based on score
-  let message = '';
-  if (score >= 90) {
-    message = 'Excellent focus today! 🎉';
-    scoreCircle.style.background = 'conic-gradient(from 0deg, rgba(34, 197, 94, 0.3) 0deg, rgba(34, 197, 94, 0.8) ' + angle + 'deg, rgba(255, 255, 255, 0.2) ' + angle + 'deg)';
-  } else if (score >= 70) {
-    message = 'Good focus, keep it up! 👍';
-    scoreCircle.style.background = 'conic-gradient(from 0deg, rgba(59, 130, 246, 0.3) 0deg, rgba(59, 130, 246, 0.8) ' + angle + 'deg, rgba(255, 255, 255, 0.2) ' + angle + 'deg)';
-  } else if (score >= 50) {
-    message = 'Room for improvement 📈';
-    scoreCircle.style.background = 'conic-gradient(from 0deg, rgba(245, 158, 11, 0.3) 0deg, rgba(245, 158, 11, 0.8) ' + angle + 'deg, rgba(255, 255, 255, 0.2) ' + angle + 'deg)';
-  } else {
-    message = 'Try to minimize distractions';
-    scoreCircle.style.background = 'conic-gradient(from 0deg, rgba(239, 68, 68, 0.3) 0deg, rgba(239, 68, 68, 0.8) ' + angle + 'deg, rgba(255, 255, 255, 0.2) ' + angle + 'deg)';
-  }
-  
-  messageElement.textContent = message;
-}
-
-// --- Replace the entire old function with this new one ---
-
-function updateTimeStats(todayData) {
-  const totalTimeElement = document.getElementById('totalTime');
-  const productiveTimeElement = document.getElementById('productiveTime');
-
-  if (!totalTimeElement || !productiveTimeElement) {
-    console.error('Missing required DOM elements for time stats display');
-    return;
-  }
-
-  const totalMinutes = Math.round(todayData.totalTime / 1000 / 60);
-  totalTimeElement.textContent = formatTime(totalMinutes);
-
-  // Define the single source of truth for productive categories
-  const productiveCategories = ['Development', 'Learning', 'Research', 'Communication'];
-  
-  let productiveMinutes = 0;
-
-  // Calculate productive time based on the same list used by the background script
-  Object.entries(todayData.timeByCategory).forEach(([category, time]) => {
-    if (productiveCategories.includes(category)) {
-      productiveMinutes += Math.round(time / 1000 / 60);
-    }
-  });
-
-  productiveTimeElement.textContent = formatTime(productiveMinutes);
-}
-
-function createTimeChart(timeByCategory) {
-  const timeChartElement = document.getElementById('timeChart');
-  const ctx = timeChartElement ? timeChartElement.getContext('2d') : null;
-  const noDataElement = document.getElementById('noDataMessage');
-  
-  if (!ctx) {
-    console.error('Chart canvas element not found');
-    return;
-  }
-  
-  if (typeof Chart === 'undefined') {
-    console.error('Chart.js library not loaded');
-    return;
-  }
-  
-  const hasData = Object.keys(timeByCategory).length > 0;
-  
-  if (!hasData) {
-    noDataElement.classList.remove('hidden');
-    return;
-  }
-  
-  noDataElement.classList.add('hidden');
-  
-  const data = Object.entries(timeByCategory).map(([category, time]) => ({
-    category,
-    time: Math.round(time / 1000 / 60)
-  })).filter(item => item.time > 0);
-  
-  const colors = {
-    'Development': '#10B981',
-    'Learning': '#3B82F6',
-    'Research': '#8B5CF6',
-    'Communication': '#06B6D4',
-    'Entertainment': '#EF4444',
-    'Social Media': '#F59E0B',
-    'News': '#EC4899',
-    'Other': '#6B7280'
-  };
-  
-  if (timeChart) {
-    timeChart.destroy();
-  }
-  
-  timeChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: data.map(item => item.category),
-      datasets: [{
-        data: data.map(item => item.time),
-        backgroundColor: data.map(item => colors[item.category] || '#6B7280'),
-        borderWidth: 2,
-        borderColor: '#fff'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: {
-            padding: 15,
-            font: {
-              size: 11
-            }
-          }
-        },
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              const label = context.label || '';
-              const value = context.parsed;
-              const total = context.dataset.data.reduce((a, b) => a + b, 0);
-              const percentage = ((value / total) * 100).toFixed(1);
-              return `${label}: ${formatTime(value)} (${percentage}%)`;
-            }
-          }
-        }
-      }
-    }
-  });
-}
-
-async function loadWeeklyData() {
   try {
-    const weekData = await getWeekData();
-    updateWeeklyStats(weekData);
-    createWeeklyChart(weekData);
-  } catch (error) {
-    console.error('Error loading weekly data:', error);
-  }
-}
-
-async function getWeekData() {
-  const weekData = [];
-  const today = new Date();
-  
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const dateString = date.toDateString();
+    const today = new Date().toDateString();
+    const result = await chrome.storage.local.get([today]);
+    const todayData = result[today] || {};
     
-    const result = await chrome.storage.local.get([dateString]);
-    weekData.push({
-      date: dateString,
-      data: result[dateString] || { focusScore: 100, totalTime: 0, timeByCategory: {} }
-    });
-  }
-  
-  return weekData;
-}
+    // Destroy existing chart
+    if (dailyChart) {
+      dailyChart.destroy();
+    }
 
-function updateWeeklyStats(weekData) {
-  const weekFocusElement = document.getElementById('weekFocusScore');
-  const weekTotalTimeElement = document.getElementById('weekTotalTime');
-  
-  const avgFocus = Math.round(
-    weekData.reduce((sum, day) => sum + day.data.focusScore, 0) / weekData.length
-  );
-  
-  const totalMinutes = weekData.reduce((sum, day) => 
-    sum + Math.round(day.data.totalTime / 1000 / 60), 0
-  );
-  
-  weekFocusElement.textContent = `${avgFocus}%`;
-  weekTotalTimeElement.textContent = `${Math.round(totalMinutes / 60)}h`;
-  
-  // Generate and display insights
-  generateDailyInsights(weekData, avgFocus, totalMinutes);
-}
+    const relevantTime = todayData.relevantTime || 0;
+    const distractedTime = todayData.distractedTime || 0;
+    
+    if (relevantTime === 0 && distractedTime === 0) {
+      document.getElementById('noDataMessage').classList.remove('hidden');
+      canvas.style.display = 'none';
+      return;
+    }
 
-function createWeeklyChart(weekData) {
-  const weeklyChartElement = document.getElementById('weeklyChart');
-  const ctx = weeklyChartElement ? weeklyChartElement.getContext('2d') : null;
-  
-  if (!ctx) {
-    console.error('Weekly chart canvas element not found');
-    return;
-  }
-  
-  if (typeof Chart === 'undefined') {
-    console.error('Chart.js library not loaded');
-    return;
-  }
-  
-  if (weeklyChart) {
-    weeklyChart.destroy();
-  }
-  
-  const labels = weekData.map(day => {
-    const date = new Date(day.date);
-    return date.toLocaleDateString('en-US', { weekday: 'short' });
-  });
-  
-  const focusScores = weekData.map(day => day.data.focusScore);
-  
-  weeklyChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Focus Score',
-        data: focusScores,
-        borderColor: '#667eea',
-        backgroundColor: 'rgba(102, 126, 234, 0.1)',
-        borderWidth: 2,
-        fill: true,
-        tension: 0.4,
-        pointBackgroundColor: '#667eea',
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-        pointRadius: 4
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: false
-        }
+    document.getElementById('noDataMessage').classList.add('hidden');
+    canvas.style.display = 'block';
+
+    dailyChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['On Task', 'Distracted'],
+        datasets: [{
+          data: [relevantTime, distractedTime],
+          backgroundColor: [
+            '#10b981', // Green for on task
+            '#ef4444'  // Red for distracted
+          ],
+          borderWidth: 0,
+          cutout: '60%'
+        }]
       },
-      scales: {
-        y: {
-          beginAtZero: true,
-          max: 100,
-          ticks: {
-            callback: function(value) {
-              return value + '%';
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              padding: 15,
+              usePointStyle: true,
+              font: {
+                size: 12
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return `${context.label}: ${Math.round(context.raw)}min`;
+              }
             }
           }
         }
       }
-    }
-  });
+    });
+  } catch (error) {
+    console.error('Error creating daily chart:', error);
+  }
 }
 
 function setupEventListeners() {
   // Settings button
-  const settingsBtn = document.getElementById('settingsBtn');
-  if (settingsBtn) {
-    settingsBtn.addEventListener('click', () => {
-      try {
-        chrome.runtime.openOptionsPage();
-      } catch (error) {
-        console.error('Error opening options page:', error);
-        // Fallback: open in new tab
-        chrome.tabs.create({ url: chrome.runtime.getURL('options.html') });
-      }
-    });
-  }
-  
-  // View report button
-  const viewReportBtn = document.getElementById('viewReportBtn');
-  if (viewReportBtn) {
-    viewReportBtn.addEventListener('click', async () => {
-      try {
-        const report = await generateWeeklyReport();
-        showWeeklyReportModal(report);
-      } catch (error) {
-        console.error('Error generating weekly report:', error);
-      }
-    });
-  }
-  
-  // Export data button
-  const exportDataBtn = document.getElementById('exportDataBtn');
-  if (exportDataBtn) {
-    exportDataBtn.addEventListener('click', async () => {
-      try {
-        await exportUserData();
-      } catch (error) {
-        console.error('Error exporting data:', error);
-      }
-    });
-  }
-}
-
-async function generateWeeklyReport() {
-  const weekData = await getWeekData();
-  
-  const totalTime = weekData.reduce((sum, day) => sum + day.data.totalTime, 0);
-  const avgFocusScore = Math.round(
-    weekData.reduce((sum, day) => sum + day.data.focusScore, 0) / weekData.length
-  );
-  
-  const categoryTotals = {};
-  weekData.forEach(day => {
-    Object.entries(day.data.timeByCategory || {}).forEach(([category, time]) => {
-      categoryTotals[category] = (categoryTotals[category] || 0) + time;
-    });
+  document.getElementById('settingsBtn').addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('options.html') });
   });
-  
-  return {
-    totalTime: Math.round(totalTime / 1000 / 60),
-    avgFocusScore,
-    categoryTotals,
-    dailyScores: weekData.map(day => day.data.focusScore)
-  };
-}
 
-function showWeeklyReportModal(report) {
-  // Create modal for weekly report
-  const modal = document.createElement('div');
-  modal.className = 'report-modal';
-  modal.innerHTML = `
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>📊 Weekly Focus Report</h2>
-        <button class="close-btn">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="report-stat">
-          <span class="report-value">${report.avgFocusScore}%</span>
-          <span class="report-label">Average Focus Score</span>
-        </div>
-        <div class="report-stat">
-          <span class="report-value">${formatTime(report.totalTime)}</span>
-          <span class="report-label">Total Time Tracked</span>
-        </div>
-        <div class="category-breakdown">
-          <h3>Time by Category</h3>
-          ${Object.entries(report.categoryTotals)
-            .sort(([,a], [,b]) => b - a)
-            .slice(0, 5)
-            .map(([category, time]) => 
-              '<div class="category-item">' +
-                '<span class="category-name">' + category + '</span>' +
-                '<span class="category-time">' + formatTime(Math.round(time / 1000 / 60)) + '</span>' +
-              '</div>'
-            ).join('')}
-        </div>
-      </div>
-    </div>
-  `;
-  
-  document.body.appendChild(modal);
-  
-  modal.querySelector('.close-btn').addEventListener('click', () => {
-    modal.remove();
+  // Daily report button
+  document.getElementById('dailyReportBtn').addEventListener('click', showDailyReport);
+
+  // Open website button
+  document.getElementById('openWebsiteBtn').addEventListener('click', () => {
+    chrome.tabs.create({ url: 'http://localhost:5173' });
   });
-  
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      modal.remove();
+
+  // Close daily report modal
+  document.getElementById('closeDailyReport').addEventListener('click', hideDailyReport);
+
+  // Close modal on outside click
+  document.getElementById('dailyReportModal').addEventListener('click', (e) => {
+    if (e.target.id === 'dailyReportModal') {
+      hideDailyReport();
     }
   });
 }
 
-async function exportUserData() {
-  try {
-    const allData = await chrome.storage.local.get();
-    const dataBlob = new Blob([JSON.stringify(allData, null, 2)], {
-      type: 'application/json'
-    });
-    
-    const url = URL.createObjectURL(dataBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `focustracker-data-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Error exporting data:', error);
+async function showDailyReport() {
+  const modal = document.getElementById('dailyReportModal');
+  modal.classList.remove('hidden');
+  
+  await createDailyReportChart();
+  await updateDailyReportStats();
+}
+
+function hideDailyReport() {
+  const modal = document.getElementById('dailyReportModal');
+  modal.classList.add('hidden');
+  
+  if (dailyReportChart) {
+    dailyReportChart.destroy();
+    dailyReportChart = null;
   }
 }
 
+async function createDailyReportChart() {
+  const canvas = document.getElementById('dailyReportChart');
+  const ctx = canvas.getContext('2d');
+  
+  try {
+    // Get today's hourly data
+    const today = new Date().toDateString();
+    const result = await chrome.storage.local.get([today]);
+    const todayData = result[today] || {};
+    
+    // Destroy existing chart
+    if (dailyReportChart) {
+      dailyReportChart.destroy();
+    }
+
+    // Create hourly breakdown data (simplified for demo)
+    const hours = [];
+    const focusData = [];
+    const currentHour = new Date().getHours();
+    
+    for (let i = 0; i <= currentHour; i++) {
+      hours.push(`${i.toString().padStart(2, '0')}:00`);
+      // Simulate some focus data (in real implementation, this would come from storage)
+      focusData.push(Math.random() * 60 + 20); // Random focus score between 20-80
+    }
+
+    dailyReportChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: hours,
+        datasets: [{
+          label: 'Hourly Focus Score',
+          data: focusData,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: '#3b82f6',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2,
+          pointRadius: 5
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 100,
+            grid: {
+              color: 'rgba(0,0,0,0.1)'
+            },
+            ticks: {
+              callback: function(value) {
+                return value + '%';
+              }
+            }
+          },
+          x: {
+            grid: {
+              color: 'rgba(0,0,0,0.1)'
+            }
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error creating daily report chart:', error);
+  }
+}
+
+async function updateDailyReportStats() {
+  try {
+    const today = new Date().toDateString();
+    const result = await chrome.storage.local.get([today]);
+    const todayData = result[today] || {};
+    
+    // Update report stats
+    document.getElementById('totalSessions').textContent = todayData.sessions || 0;
+    document.getElementById('dailyFocusScore').textContent = `${todayData.focusScore || '--'}%`;
+    document.getElementById('timeOnTask').textContent = `${Math.round(todayData.relevantTime || 0)}m`;
+  } catch (error) {
+    console.error('Error updating daily report stats:', error);
+  }
+}
+
+// Helper functions
 function formatTime(minutes) {
   if (minutes < 60) {
-    return `${minutes}m`;
-  }
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
-}
-
-function generateDailyInsights(weekData, avgFocus, totalMinutes) {
-  const insights = [];
-  const today = new Date().toDateString();
-  const todayDataEntry = weekData.find(day => day.date === today);
-  const todayData = todayDataEntry ? todayDataEntry.data : { focusScore: 100, timeByCategory: {} };
-  
-  // Focus score insights
-  if (avgFocus >= 80) {
-    insights.push({
-      type: 'success',
-      icon: '🎯',
-      message: `Great focus this week! Average score: ${avgFocus}%`
-    });
-  } else if (avgFocus >= 60) {
-    insights.push({
-      type: 'warning', 
-      icon: '📈',
-      message: `Focus could improve. Try reducing distractions by 15 min/day`
-    });
+    return `${Math.round(minutes)}m`;
   } else {
-    insights.push({
-      type: 'alert',
-      icon: '🚨', 
-      message: `Focus needs attention. Consider using website blockers`
-    });
-  }
-  
-  // Time management insight
-  const dailyAvgHours = Math.round((totalMinutes / 7) / 60 * 10) / 10;
-  if (dailyAvgHours < 4) {
-    insights.push({
-      type: 'info',
-      icon: '⏱️',
-      message: `Low activity: ${dailyAvgHours}h/day average. Increase tracked time`
-    });
-  } else if (dailyAvgHours > 10) {
-    insights.push({
-      type: 'warning',
-      icon: '🔥',
-      message: `High activity: ${dailyAvgHours}h/day. Consider breaks`
-    });
-  }
-  
-  // Category-specific insights
-  const productiveCategories = ['Development', 'Learning', 'Research', 'Communication'];
-  const distractingCategories = ['Entertainment', 'Social Media', 'News'];
-  
-  let topDistraction = { category: '', time: 0 };
-  let topProductive = { category: '', time: 0 };
-  
-  Object.entries(todayData.timeByCategory).forEach(([category, time]) => {
-    if (distractingCategories.includes(category) && time > topDistraction.time) {
-      topDistraction = { category, time };
-    }
-    if (productiveCategories.includes(category) && time > topProductive.time) {
-      topProductive = { category, time };
-    }
-  });
-  
-  if (topProductive.category) {
-    insights.push({
-      type: 'success',
-      icon: '💪',
-      message: `Top strength: ${topProductive.category} (${Math.round(topProductive.time/1000/60)}min today)`
-    });
-  }
-  
-  if (topDistraction.time > 30 * 60 * 1000) { // More than 30 minutes
-    insights.push({
-      type: 'warning',
-      icon: '⚠️',
-      message: `Top distraction: ${topDistraction.category} (${Math.round(topDistraction.time/1000/60)}min today)`
-    });
-  }
-  
-  displayInsights(insights);
-}
-
-function displayInsights(insights) {
-  let insightsContainer = document.getElementById('insights-container');
-  
-  if (!insightsContainer) {
-    insightsContainer = document.createElement('div');
-    insightsContainer.id = 'insights-container';
-    insightsContainer.className = 'insights-section';
-    
-    // Insert after weekly section
-    const weeklySection = document.querySelector('.weekly-section');
-    if (weeklySection) {
-      weeklySection.insertAdjacentElement('afterend', insightsContainer);
-    }
-  }
-  
-  insightsContainer.innerHTML = `
-    <h3>💡 Insights & Recommendations</h3>
-    <div class="insights-list"></div>
-  `;
-
-  const list = insightsContainer.querySelector('.insights-list');
-  list.innerHTML = '';
-  for (var i = 0; i < insights.length; i++) {
-    var insight = insights[i];
-    var item = document.createElement('div');
-    item.className = 'insight-item insight-' + insight.type;
-
-    var iconSpan = document.createElement('span');
-    iconSpan.className = 'insight-icon';
-    iconSpan.textContent = insight.icon;
-
-    var messageSpan = document.createElement('span');
-    messageSpan.className = 'insight-message';
-    messageSpan.textContent = insight.message;
-
-    item.appendChild(iconSpan);
-    item.appendChild(messageSpan);
-    list.appendChild(item);
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    return `${hours}h ${mins}m`;
   }
 }
 
-
+// Cleanup on unload
+window.addEventListener('beforeunload', () => {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+  }
+  if (dailyChart) {
+    dailyChart.destroy();
+  }
+  if (dailyReportChart) {
+    dailyReportChart.destroy();
+  }
+});

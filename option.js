@@ -18,7 +18,10 @@ async function loadSettings() {
       trackInactive: false,
       minSessionTime: 5,
       dataRetention: 90,
-      customRules: []
+      customRules: [],
+      enableAI: true,
+      geminiApiKey: '',
+      enableFallback: true
     });
 
     // Apply settings to UI
@@ -30,8 +33,16 @@ async function loadSettings() {
     document.getElementById('minSessionTime').value = settings.minSessionTime;
     document.getElementById('dataRetention').value = settings.dataRetention;
 
+    // AI Settings
+    document.getElementById('enableAI').checked = settings.enableAI;
+    document.getElementById('geminiApiKey').value = settings.geminiApiKey;
+    document.getElementById('enableFallback').checked = settings.enableFallback;
+
     // Show/hide email settings based on weekly reports toggle
     toggleEmailSettings(settings.weeklyReports);
+    
+    // Show/hide API settings based on AI toggle
+    toggleAISettings(settings.enableAI);
     
     // Load custom rules
     loadCustomRules(settings.customRules);
@@ -74,11 +85,83 @@ function setupEventListeners() {
       editCategory(category);
     });
   });
+
+  // AI Settings
+  document.getElementById('enableAI').addEventListener('change', (e) => {
+    toggleAISettings(e.target.checked);
+  });
+
+  document.getElementById('testApiBtn').addEventListener('click', testGeminiAPI);
 }
 
 function toggleEmailSettings(show) {
   const emailSettings = document.getElementById('emailSettings');
   emailSettings.style.display = show ? 'flex' : 'none';
+}
+
+function toggleAISettings(show) {
+  const apiSettings = document.getElementById('geminiApiSettings');
+  apiSettings.style.display = show ? 'flex' : 'none';
+}
+
+async function testGeminiAPI() {
+  const apiKeyInput = document.getElementById('geminiApiKey');
+  const testBtn = document.getElementById('testApiBtn');
+  const statusDiv = document.getElementById('apiStatus');
+  
+  const apiKey = apiKeyInput.value.trim();
+  
+  if (!apiKey) {
+    showAPIStatus('Please enter an API key', 'error');
+    return;
+  }
+  
+  // Disable button and show testing status
+  testBtn.disabled = true;
+  testBtn.textContent = 'Testing...';
+  showAPIStatus('Testing API connection...', 'testing');
+  
+  try {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: 'Respond with just the number "42"'
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 10
+        }
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok && data.candidates && data.candidates[0]) {
+      showAPIStatus('API connection successful! ✓', 'success');
+    } else {
+      throw new Error(data.error?.message || 'API test failed');
+    }
+  } catch (error) {
+    console.error('API test error:', error);
+    showAPIStatus('API test failed: ' + error.message, 'error');
+  } finally {
+    // Re-enable button
+    testBtn.disabled = false;
+    testBtn.textContent = 'Test Connection';
+  }
+}
+
+function showAPIStatus(message, type) {
+  const statusDiv = document.getElementById('apiStatus');
+  statusDiv.textContent = message;
+  statusDiv.className = 'api-status ' + type;
+  statusDiv.style.display = 'block';
 }
 
 function loadCustomRules(rules) {
@@ -227,7 +310,10 @@ async function saveSettings() {
       focusGoal: parseInt(document.getElementById('focusGoal').value),
       trackInactive: document.getElementById('trackInactive').checked,
       minSessionTime: parseInt(document.getElementById('minSessionTime').value),
-      dataRetention: parseInt(document.getElementById('dataRetention').value)
+      dataRetention: parseInt(document.getElementById('dataRetention').value),
+      enableAI: document.getElementById('enableAI').checked,
+      geminiApiKey: document.getElementById('geminiApiKey').value.trim(),
+      enableFallback: document.getElementById('enableFallback').checked
     };
 
     await chrome.storage.sync.set(settings);
