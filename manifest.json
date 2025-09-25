@@ -3,6 +3,7 @@
     "name": "LockedIn - Focus Timer & Productivity Tracker",
     "version": "1.0.0",
     "description": "Stay focused with timer tracking, website blacklisting, and AI-powered insights. Block distractions and boost productivity.",
+
     "permissions": [
       "activeTab",
       "storage",
@@ -36,7 +37,7 @@
     },
     "options_page": "options.html",
     "content_security_policy": {
-      "extension_pages": "script-src 'self'; object-src 'self';"
+      "extension_pages": "script-src 'self' 'wasm-unsafe-eval' http://localhost:* http://127.0.0.1:*; object-src 'self'"
     },
     "web_accessible_resources": [
       {
