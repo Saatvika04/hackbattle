@@ -348,3 +348,86 @@ chrome.idle.onStateChanged.addListener(function(state) {
     updateBehavioralMetrics('windowFocus');
   }
 });
+
+// ===== BLACKLIST BLOCKING VIA DECLARATIVE NET REQUEST =====
+
+// Generate a stable numeric ID for each rule from a domain string
+function domainRuleId(domain) {
+  var h = 0;
+  for (var i = 0; i < domain.length; i++) {
+    h = ((h << 5) - h) + domain.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h) % 2000000000 + 1000;
+}
+
+function toHostnamePattern(domain) {
+  try {
+    var u = new URL(domain.startsWith('http') ? domain : ('https://' + domain));
+    return u.hostname.replace(/^www\./, '');
+  } catch (e) {
+    return domain.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+  }
+}
+
+function buildBlockRules(domains) {
+  var rules = [];
+  for (var i = 0; i < domains.length; i++) {
+    var host = toHostnamePattern(domains[i]);
+    if (!host) continue;
+    var id = domainRuleId(host);
+    rules.push({
+      id: id,
+      priority: 1,
+      action: { type: 'block' },
+      condition: {
+        urlFilter: '||' + host,
+        resourceTypes: ['main_frame']
+      }
+    });
+  }
+  return rules;
+}
+
+function updateBlocking(active, blacklist) {
+  var domains = Array.isArray(blacklist) ? blacklist : [];
+  var rulesToAdd = active ? buildBlockRules(domains) : [];
+  var removeIds = [];
+
+  for (var i = 0; i < domains.length; i++) {
+    var host = toHostnamePattern(domains[i]);
+    if (!host) continue;
+    removeIds.push(domainRuleId(host));
+  }
+
+  chrome.declarativeNetRequest.updateDynamicRules({
+    addRules: rulesToAdd,
+    removeRuleIds: removeIds
+  }, function() {
+    if (chrome.runtime.lastError) {
+      console.log('DNR update error:', chrome.runtime.lastError.message);
+    }
+  });
+}
+
+function applyBlockingFromState() {
+  chrome.storage.local.get(['isTaskActive', 'lockedInBlacklist'], function(res) {
+    var active = !!res.isTaskActive;
+    var bl = res.lockedInBlacklist || [];
+    updateBlocking(active, bl);
+  });
+}
+
+chrome.storage.onChanged.addListener(function(changes, area) {
+  if (area !== 'local') return;
+  chrome.storage.local.get(['isTaskActive', 'lockedInBlacklist'], function(res) {
+    var active = !!res.isTaskActive;
+    var bl = res.lockedInBlacklist || [];
+    updateBlocking(active, bl);
+  });
+});
+
+chrome.runtime.onInstalled.addListener(applyBlockingFromState);
+if (chrome.runtime.onStartup) {
+  chrome.runtime.onStartup.addListener(applyBlockingFromState);
+}

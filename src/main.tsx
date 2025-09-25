@@ -41,17 +41,38 @@ function App() {
   const [blacklist, setBlacklist] = useState(defaultBlacklist);
   const [newSite, setNewSite] = useState("");
 
-  // Load blacklist from localStorage on component mount
+  // Load blacklist from chrome.storage.local (fallback to localStorage) on mount
   useEffect(() => {
-    const savedBlacklist = localStorage.getItem('lockedInBlacklist');
-    if (savedBlacklist) {
-      setBlacklist(JSON.parse(savedBlacklist));
+    try {
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.get(['lockedInBlacklist'], (res) => {
+          if (Array.isArray(res.lockedInBlacklist)) {
+            setBlacklist(res.lockedInBlacklist);
+          } else {
+            const saved = localStorage.getItem('lockedInBlacklist');
+            if (saved) setBlacklist(JSON.parse(saved));
+          }
+        });
+      } else {
+        const saved = localStorage.getItem('lockedInBlacklist');
+        if (saved) setBlacklist(JSON.parse(saved));
+      }
+    } catch (_) {
+      const saved = localStorage.getItem('lockedInBlacklist');
+      if (saved) setBlacklist(JSON.parse(saved));
     }
   }, []);
 
-  // Save blacklist to localStorage whenever it changes
+  // Save blacklist to localStorage and chrome.storage.local whenever it changes
   useEffect(() => {
-    localStorage.setItem('lockedInBlacklist', JSON.stringify(blacklist));
+    try {
+      localStorage.setItem('lockedInBlacklist', JSON.stringify(blacklist));
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.set({ lockedInBlacklist: blacklist });
+      }
+    } catch (_) {
+      // ignore storage errors
+    }
   }, [blacklist]);
 
   const handleStart = (e: React.FormEvent) => {
